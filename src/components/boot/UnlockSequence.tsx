@@ -23,7 +23,7 @@ export function UnlockSequence({ onComplete }: { onComplete: () => void }) {
   const [online, setOnline] = useState(0)
   const [operational, setOperational] = useState(false)
 
-  const step = calm ? 90 : 300
+  const step = calm ? 90 : 265
 
   useEffect(() => {
     cue('unlock')
@@ -51,7 +51,7 @@ export function UnlockSequence({ onComplete }: { onComplete: () => void }) {
       ),
     )
     timers.push(
-      window.setTimeout(onComplete, (calm ? 480 : 520) + MODULES.length * step + (calm ? 300 : 1500)),
+      window.setTimeout(onComplete, (calm ? 480 : 520) + MODULES.length * step + (calm ? 300 : 1250)),
     )
     return () => timers.forEach(window.clearTimeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps

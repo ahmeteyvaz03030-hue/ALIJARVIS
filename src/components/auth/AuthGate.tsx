@@ -70,7 +70,7 @@ export function AuthGate({ onAuthorized }: { onAuthorized: (s: JarvisSession) =>
           pulseCore(1, 700)
           pushLog(`Identity confirmed — ${result.session.displayName}`, 'ok')
           schedule(() => setPhase('confirmed'), 1150)
-          schedule(() => onAuthorized(result.session), 3350)
+          schedule(() => onAuthorized(result.session), 2950)
         } else {
           setPhase('denied')
           setError(result.message)

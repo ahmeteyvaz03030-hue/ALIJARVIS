@@ -65,7 +65,7 @@ export default function Globe3D({ height = 340 }: { height?: number }) {
     const width = mount.clientWidth || 320
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100)
-    camera.position.set(0, 0, 3.15)
+    camera.position.set(0, 0, 3.55)
     camera.lookAt(0, 0, 0)
 
     let renderer: THREE.WebGLRenderer
@@ -89,13 +89,15 @@ export default function Globe3D({ height = 340 }: { height?: number }) {
     // Two nested groups: the outer one tilts the globe so mid-northern
     // latitudes face the camera, the inner one spins on the polar axis. Keeping
     // them separate means the spin never wobbles.
+    // Angles solved for the mid-point of the FRA→DLM corridor (43.5°N, 18.5°E):
+    // Ry brings that meridian onto the camera axis, Rx lifts it to the equator,
+    // so the route starts dead-centre and the slow spin carries it away.
     const tilt = new THREE.Group()
-    tilt.rotation.x = 0.58
-    tilt.rotation.z = 0.1
+    tilt.rotation.x = 0.759
+    tilt.rotation.z = 0.06
     scene.add(tilt)
     const world = new THREE.Group()
-    // Bring Europe/Anatolia to the front.
-    world.rotation.y = -1.15
+    world.rotation.y = -1.894
     tilt.add(world)
 
     const disposables: Array<{ dispose: () => void }> = []
