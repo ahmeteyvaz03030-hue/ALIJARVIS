@@ -1,0 +1,413 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   RONALJARVIS — design tokens
+   ========================================================================== */
+@theme {
+  --color-void: #04080d;
+  --color-abyss: #06111a;
+  --color-hull: #0a1a26;
+  --color-grid: #123243;
+  --color-cyan: #35e6ff;
+  --color-cyan-dim: #1a8ba3;
+  --color-ice: #b6f4ff;
+  --color-amber: #ffb54d;
+  --color-lime: #7cff9b;
+  --color-danger: #ff5a6e;
+  --color-violet: #a97bff;
+
+  --font-display: 'Orbitron', 'Rajdhani', ui-sans-serif, system-ui, sans-serif;
+  --font-ui: 'Rajdhani', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', monospace;
+}
+
+:root {
+  --hud-line: rgb(53 230 255 / 0.22);
+  --hud-line-soft: rgb(53 230 255 / 0.1);
+  --hud-glow: rgb(53 230 255 / 0.45);
+  --panel-bg: linear-gradient(160deg, rgb(10 26 38 / 0.82), rgb(4 12 18 / 0.9));
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body,
+#jarvis-root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-void);
+  color: var(--color-ice);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+::selection {
+  background: rgb(53 230 255 / 0.3);
+  color: #fff;
+}
+
+/* Thin HUD scrollbars ---------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(53 230 255 / 0.35) transparent;
+}
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: rgb(53 230 255 / 0.05); }
+*::-webkit-scrollbar-thumb {
+  background: rgb(53 230 255 / 0.32);
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgb(53 230 255 / 0.55); }
+
+/* ==========================================================================
+   Typographic helpers
+   ========================================================================== */
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+
+.hud-label {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgb(53 230 255 / 0.62);
+}
+
+.hud-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-ice);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-glow {
+  text-shadow: 0 0 8px rgb(53 230 255 / 0.55), 0 0 26px rgb(53 230 255 / 0.22);
+}
+.text-glow-strong {
+  text-shadow: 0 0 6px rgb(182 244 255 / 0.9), 0 0 22px rgb(53 230 255 / 0.7),
+    0 0 60px rgb(53 230 255 / 0.35);
+}
+.text-glow-lime {
+  text-shadow: 0 0 8px rgb(124 255 155 / 0.7), 0 0 30px rgb(124 255 155 / 0.3);
+}
+
+/* ==========================================================================
+   Panels / HUD chrome
+   ========================================================================== */
+.panel {
+  position: relative;
+  background: var(--panel-bg);
+  border: 1px solid var(--hud-line);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 1px 0 rgb(182 244 255 / 0.06),
+    inset 0 0 40px rgb(53 230 255 / 0.03),
+    0 18px 50px -30px rgb(0 0 0 / 0.9);
+}
+
+/* Angled corner cut — the signature HUD silhouette. */
+.panel-cut {
+  clip-path: polygon(
+    0 14px, 14px 0,
+    calc(100% - 14px) 0, 100% 14px,
+    100% calc(100% - 14px), calc(100% - 14px) 100%,
+    14px 100%, 0 calc(100% - 14px)
+  );
+}
+.panel-cut-sm {
+  clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+}
+
+/* Bracket corners drawn with pseudo elements (cheap, no extra nodes). */
+.corner-brackets::before,
+.corner-brackets::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-cyan);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.corner-brackets::before {
+  top: -1px; left: -1px;
+  border-right: 0; border-bottom: 0;
+}
+.corner-brackets::after {
+  bottom: -1px; right: -1px;
+  border-left: 0; border-top: 0;
+}
+
+.hairline-grid {
+  background-image:
+    linear-gradient(rgb(53 230 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(53 230 255 / 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+}
+
+/* CRT scanlines + vignette, applied to the app frame. */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgb(53 230 255 / 0.028) 0px,
+      rgb(53 230 255 / 0.028) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  mix-blend-mode: screen;
+  opacity: 0.75;
+}
+.vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 89;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    transparent 40%,
+    rgb(2 5 8 / 0.55) 100%
+  );
+}
+
+/* ==========================================================================
+   Keyframes — all transform/opacity only
+   ========================================================================== */
+@keyframes jv-spin { to { transform: rotate(360deg); } }
+@keyframes jv-spin-rev { to { transform: rotate(-360deg); } }
+
+@keyframes jv-blink {
+  0%, 45% { opacity: 1; }
+  50%, 95% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes jv-pulse-ring {
+  0% { transform: scale(0.7); opacity: 0.7; }
+  70% { opacity: 0.12; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+@keyframes jv-sweep-y {
+  0% { transform: translate3d(0, -110%, 0); opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translate3d(0, 110%, 0); opacity: 0; }
+}
+
+@keyframes jv-sweep-x {
+  0% { transform: translate3d(-110%, 0, 0); }
+  100% { transform: translate3d(110%, 0, 0); }
+}
+
+@keyframes jv-shimmer {
+  0% { transform: translate3d(-130%, 0, 0) skewX(-18deg); }
+  100% { transform: translate3d(130%, 0, 0) skewX(-18deg); }
+}
+
+@keyframes jv-flicker {
+  0%, 100% { opacity: 1; }
+  42% { opacity: 1; }
+  43% { opacity: 0.72; }
+  45% { opacity: 1; }
+  62% { opacity: 0.86; }
+  64% { opacity: 1; }
+}
+
+@keyframes jv-drift {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -8px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes jv-dash {
+  to { stroke-dashoffset: -1000; }
+}
+
+.jv-blink { animation: jv-blink 1.05s steps(1, end) infinite; }
+.jv-flicker { animation: jv-flicker 6s linear infinite; }
+.jv-drift { animation: jv-drift 7s ease-in-out infinite; }
+
+/* Animated shimmer on the top edge of a panel. */
+.edge-shimmer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.edge-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-cyan), transparent);
+  animation: jv-shimmer 4.5s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  will-change: transform;
+}
+
+/* Holographic sheen that follows the pointer (vars set from JS). */
+.holo-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 320ms ease;
+  background: radial-gradient(
+    380px circle at var(--mx, 50%) var(--my, 50%),
+    rgb(53 230 255 / 0.16),
+    transparent 62%
+  );
+}
+.group\/holo:hover .holo-sheen,
+.holo-active .holo-sheen { opacity: 1; }
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+.hud-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.62rem 1.35rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-ice);
+  background: linear-gradient(180deg, rgb(53 230 255 / 0.14), rgb(53 230 255 / 0.04));
+  border: 1px solid rgb(53 230 255 / 0.4);
+  overflow: hidden;
+  cursor: pointer;
+  isolation: isolate;
+  transition: color 200ms ease, border-color 200ms ease, box-shadow 240ms ease;
+  clip-path: polygon(0 7px, 7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
+}
+.hud-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(120deg, transparent, rgb(53 230 255 / 0.3), transparent);
+  transform: translate3d(-110%, 0, 0);
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hud-btn:hover:not(:disabled) {
+  border-color: rgb(53 230 255 / 0.9);
+  box-shadow: 0 0 0 1px rgb(53 230 255 / 0.16), 0 0 26px -4px var(--hud-glow),
+    inset 0 0 24px rgb(53 230 255 / 0.12);
+}
+.hud-btn:hover:not(:disabled)::before { transform: translate3d(110%, 0, 0); }
+.hud-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 0 2px rgb(53 230 255 / 0.35), 0 0 30px -6px var(--hud-glow);
+}
+.hud-btn:disabled { opacity: 0.42; cursor: not-allowed; }
+
+.hud-btn-ghost {
+  background: transparent;
+  border-color: rgb(53 230 255 / 0.22);
+  color: rgb(182 244 255 / 0.75);
+}
+.hud-btn-primary {
+  background: linear-gradient(180deg, rgb(53 230 255 / 0.3), rgb(53 230 255 / 0.09));
+  border-color: rgb(53 230 255 / 0.75);
+  color: #eafcff;
+}
+.hud-btn-danger {
+  background: linear-gradient(180deg, rgb(255 90 110 / 0.22), rgb(255 90 110 / 0.05));
+  border-color: rgb(255 90 110 / 0.5);
+  color: #ffd9de;
+}
+
+/* Loading scanner that sweeps across a busy button. */
+.btn-scanner {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.btn-scanner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgb(182 244 255 / 0.5), transparent);
+  animation: jv-sweep-x 1.05s linear infinite;
+  will-change: transform;
+}
+
+/* ==========================================================================
+   Inputs
+   ========================================================================== */
+.hud-input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: rgb(4 12 18 / 0.75);
+  border: 1px solid rgb(53 230 255 / 0.28);
+  color: var(--color-ice);
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  letter-spacing: 0.42em;
+  transition: border-color 220ms ease, box-shadow 260ms ease, background 220ms ease;
+}
+.hud-input::placeholder {
+  color: rgb(53 230 255 / 0.3);
+  letter-spacing: 0.28em;
+}
+.hud-input:focus {
+  outline: none;
+  border-color: rgb(53 230 255 / 0.85);
+  background: rgb(6 18 26 / 0.9);
+  box-shadow: 0 0 0 1px rgb(53 230 255 / 0.2), 0 0 34px -8px var(--hud-glow),
+    inset 0 0 22px rgb(53 230 255 / 0.07);
+}
+
+/* ==========================================================================
+   Reduced motion — kill the heavy, continuous stuff.
+   `data-motion="calm"` is set by the settings toggle *and* by the OS query.
+   ========================================================================== */
+[data-motion='calm'] .crt-overlay,
+[data-motion='calm'] .edge-shimmer,
+[data-motion='calm'] .holo-sheen { display: none; }
+
+[data-motion='calm'] .jv-blink,
+[data-motion='calm'] .jv-flicker,
+[data-motion='calm'] .jv-drift,
+[data-motion='calm'] .btn-scanner::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+[data-motion='calm'] .hud-btn::before { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .jv-drift, .jv-flicker, .edge-shimmer::after { animation: none; }
+}
+
+/* Utility: hide the caret but keep the field usable (passcode field). */
+.caret-none { caret-color: transparent; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

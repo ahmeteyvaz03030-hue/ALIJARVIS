@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de" data-theme="jarvis">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#04080d" />
+    <meta name="description" content="RonalJarvis — persönliches Betriebssystem von Ali." />
+    <title>RONALJARVIS // CORE</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Painted before React mounts so the boot sequence starts from true black. */
+      html, body { margin: 0; background: #04080d; color: #7ff3ff; }
+      #jarvis-root { min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="jarvis-root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
