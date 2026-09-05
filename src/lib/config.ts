@@ -39,11 +39,11 @@ export const TRIP = {
   flightNumber: 'RJ-2317',
   carrier: 'RONALJARVIS AIR OPS',
   /** Local wheels-up in Frankfurt. */
-  departure: new Date('2026-09-05T06:35:00+02:00'),
+  departure: new Date('2026-09-06T06:35:00+02:00'),
   /** Local touchdown at Dalaman. */
-  arrival: new Date('2026-09-05T11:05:00+03:00'),
+  arrival: new Date('2026-09-06T11:05:00+03:00'),
   /** Return leg — ends holiday mode. */
-  returnFlight: new Date('2026-09-12T12:20:00+03:00'),
+  returnFlight: new Date('2026-09-13T12:20:00+03:00'),
   distanceKm: 2374,
   cruiseAltitudeFt: 38_000,
   cruiseSpeedKmh: 875,

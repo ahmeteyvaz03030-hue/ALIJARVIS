@@ -10,6 +10,8 @@ export interface Poi {
   radar: number
   distanceKm: number
   note: string
+  /** Wikipedia article candidates for a real photo, tried in order (see lib/wikiImages.ts). */
+  wiki: Array<{ lang: string; title: string }>
 }
 
 /** Points of interest that populate the MARMARIS AREA SCAN radar. */
@@ -23,6 +25,7 @@ export const POIS: Poi[] = [
     radar: 0.18,
     distanceKm: 0.9,
     note: 'Festung aus dem 16. Jh. über dem alten Hafen — bester Blick auf die Bucht.',
+    wiki: [{ lang: 'tr', title: 'Marmaris Kalesi' }, { lang: 'en', title: 'Marmaris Castle' }],
   },
   {
     id: 'icmeler',
@@ -33,6 +36,7 @@ export const POIS: Poi[] = [
     radar: 0.52,
     distanceKm: 8.4,
     note: 'Langer Kiesstrand, ruhigeres Wasser, Berge direkt im Rücken.',
+    wiki: [{ lang: 'tr', title: 'İçmeler' }, { lang: 'en', title: 'İçmeler' }],
   },
   {
     id: 'turunc',
@@ -43,6 +47,7 @@ export const POIS: Poi[] = [
     radar: 0.78,
     distanceKm: 18.6,
     note: 'Per Boot in 25 Minuten. Türkisblaue Bucht, wenig Trubel.',
+    wiki: [{ lang: 'tr', title: 'Turunç, Marmaris' }, { lang: 'en', title: 'Turunç' }],
   },
   {
     id: 'paradise',
@@ -53,6 +58,7 @@ export const POIS: Poi[] = [
     radar: 0.62,
     distanceKm: 12.1,
     note: 'Nimara-Insel mit Höhle und Panoramaweg über dem Golf.',
+    wiki: [{ lang: 'tr', title: 'Nimara Mağarası' }, { lang: 'en', title: 'Nimara Cave' }],
   },
   {
     id: 'sunset',
@@ -63,6 +69,7 @@ export const POIS: Poi[] = [
     radar: 0.44,
     distanceKm: 6.2,
     note: 'Sonnenuntergang über der Bucht — beste Zeit 19:40.',
+    wiki: [{ lang: 'tr', title: 'Marmaris Günbatımı' }],
   },
   {
     id: 'marina',
@@ -73,6 +80,7 @@ export const POIS: Poi[] = [
     radar: 0.26,
     distanceKm: 1.6,
     note: 'Yachthafen mit Promenade, Cafés und Bootstouren.',
+    wiki: [{ lang: 'en', title: 'Netsel Marina' }],
   },
   {
     id: 'bozburun',
@@ -83,6 +91,7 @@ export const POIS: Poi[] = [
     radar: 0.95,
     distanceKm: 42.0,
     note: 'Ruhiges Fischerdorf auf der Halbinsel — Gulet-Werften.',
+    wiki: [{ lang: 'tr', title: 'Bozburun' }, { lang: 'en', title: 'Bozburun' }],
   },
 ]
 

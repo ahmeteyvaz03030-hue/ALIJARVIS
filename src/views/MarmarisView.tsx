@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSystem } from '../state/SystemProvider'
 import { DESTINATION } from '../lib/config'
 import { EASE, calmPanelVariants, panelVariants } from '../lib/motion'
 import { useHoloTilt } from '../lib/hooks'
+import { getLandmarkImage, type WikiImage } from '../lib/wikiImages'
 import { HoloCard } from '../components/hud/HoloCard'
 import { StatusPill } from '../components/hud/Readout'
 import { Radar } from '../components/sim/Radar'
@@ -11,6 +12,77 @@ import { WeatherPanel } from '../components/weather/WeatherPanel'
 import { KIND_TONE, MARMARIS_FACTS, POIS, type Poi } from '../data/marmaris'
 
 const TONE_RGB = { cyan: '53,230,255', lime: '124,255,155', amber: '255,181,77' }
+
+/** Fetches a real landmark photo once per POI; resolves to `null` on any
+ *  failure so the card can fall back to the procedural placeholder. */
+function usePoiPhoto(poi: Poi): WikiImage | null | 'loading' {
+  const [photo, setPhoto] = useState<WikiImage | null | 'loading'>('loading')
+  useEffect(() => {
+    let cancelled = false
+    setPhoto('loading')
+    void getLandmarkImage(poi.wiki).then((result) => {
+      if (!cancelled) setPhoto(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [poi])
+  return photo
+}
+
+function PoiPhoto({ poi, rgb }: { poi: Poi; rgb: string }) {
+  const photo = usePoiPhoto(poi)
+
+  if (photo && photo !== 'loading') {
+    return (
+      <>
+        <img
+          src={photo.url}
+          alt={poi.name}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/holo:scale-[1.06]"
+        />
+        <div
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(to top, rgba(4,8,13,0.92), rgba(4,8,13,0.15) 55%, transparent)' }}
+        />
+        <a
+          href={photo.pageUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute bottom-1 right-1.5 font-mono text-[0.45rem] tracking-[0.08em] text-ice/40 opacity-0 transition-opacity hover:text-ice/80 group-hover/holo:opacity-100"
+        >
+          FOTO: WIKIPEDIA
+        </a>
+      </>
+    )
+  }
+
+  // No real photo (not found, or still loading) — a deliberate placeholder,
+  // not empty space: the POI's category rendered as oversized HUD texture.
+  return (
+    <div
+      className="absolute inset-0 flex items-center justify-center overflow-hidden"
+      style={{ background: `linear-gradient(150deg, rgba(${rgb},0.22), rgba(4,12,18,0.94))` }}
+    >
+      <span
+        className="select-none font-display text-2xl font-black tracking-[0.1em] opacity-[0.14]"
+        style={{ color: `rgb(${rgb})` }}
+      >
+        {poi.kind}
+      </span>
+      {photo === 'loading' && (
+        <motion.span
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(100deg, transparent 40%, rgba(${rgb},0.16) 50%, transparent 60%)` }}
+          animate={{ x: ['-100%', '100%'] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
+        />
+      )}
+    </div>
+  )
+}
 
 function PoiCard({
   poi,
@@ -44,40 +116,47 @@ function PoiCard({
         ref={tilt.ref}
         onPointerMove={tilt.onPointerMove}
         onPointerLeave={tilt.onPointerLeave}
-        className="panel-cut-sm relative h-full overflow-hidden border p-3 transition-colors duration-300"
+        className="panel-cut-sm relative flex h-full flex-col overflow-hidden border transition-colors duration-300"
         style={{
           borderColor: active ? `rgba(${rgb},0.7)` : `rgba(${rgb},0.2)`,
-          background: active
-            ? `linear-gradient(150deg, rgba(${rgb},0.12), rgba(4,12,18,0.9))`
-            : 'linear-gradient(150deg, rgba(10,26,38,0.7), rgba(4,12,18,0.9))',
+          background: 'rgb(10,26,38)',
           transform: calm ? undefined : 'rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))',
           transition: 'transform 280ms cubic-bezier(0.16,1,0.3,1), border-color 300ms ease',
           willChange: 'transform',
         }}
       >
-        <div
-          className="holo-sheen"
-          style={{
-            background: `radial-gradient(280px circle at var(--mx,50%) var(--my,50%), rgba(${rgb},0.18), transparent 60%)`,
-          }}
-        />
-        <div className="relative flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div
-              className="font-display text-[0.7rem] font-black tracking-[0.1em]"
-              style={{ color: `rgb(${rgb})` }}
-            >
-              {poi.name}
-            </div>
-            <div className="mt-0.5 font-mono text-[0.5rem] tracking-[0.18em] text-cyan/45">
-              {poi.kind} · BRG {String(poi.bearing).padStart(3, '0')}°
-            </div>
-          </div>
-          <span className="shrink-0 font-mono text-[0.62rem] tabular-nums text-ice/70">
+        <div className="relative h-24 shrink-0 overflow-hidden border-b" style={{ borderColor: `rgba(${rgb},0.18)` }}>
+          <PoiPhoto poi={poi} rgb={rgb} />
+          <span
+            className="absolute left-2 top-2 border px-1.5 py-0.5 font-display text-[0.44rem] font-black tracking-[0.14em]"
+            style={{ borderColor: `rgba(${rgb},0.5)`, color: `rgb(${rgb})`, background: 'rgba(4,8,13,0.7)' }}
+          >
+            {poi.kind}
+          </span>
+          <span className="absolute right-2 top-2 font-mono text-[0.55rem] tabular-nums text-ice/80" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
             {poi.distanceKm.toFixed(1)} KM
           </span>
         </div>
-        <p className="relative mt-2 text-[0.76rem] leading-relaxed text-ice/65">{poi.note}</p>
+
+        <div className="relative flex-1 p-3">
+          <div
+            className="holo-sheen"
+            style={{
+              background: `radial-gradient(280px circle at var(--mx,50%) var(--my,50%), rgba(${rgb},0.18), transparent 60%)`,
+            }}
+          />
+          <div
+            className="relative font-display text-[0.7rem] font-black tracking-[0.1em]"
+            style={{ color: `rgb(${rgb})` }}
+          >
+            {poi.name}
+          </div>
+          <div className="relative mt-0.5 font-mono text-[0.5rem] tracking-[0.18em] text-cyan/45">
+            BRG {String(poi.bearing).padStart(3, '0')}°
+          </div>
+          <p className="relative mt-2 text-[0.76rem] leading-relaxed text-ice/65">{poi.note}</p>
+        </div>
+
         {/* selection rail */}
         <motion.span
           className="absolute bottom-0 left-0 h-[2px]"

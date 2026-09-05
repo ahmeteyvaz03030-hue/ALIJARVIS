@@ -1,8 +1,25 @@
 import { motion } from 'framer-motion'
 import { useSystem } from '../../state/SystemProvider'
-import { IconComms, IconCore, IconFilm, IconPin, IconPlane, IconSettings } from './Icons'
+import {
+  IconChecklist,
+  IconComms,
+  IconCore,
+  IconFilm,
+  IconPin,
+  IconPlane,
+  IconSettings,
+  IconTrophy,
+} from './Icons'
 
-export type ViewId = 'home' | 'travel' | 'marmaris' | 'movies' | 'comms' | 'settings'
+export type ViewId =
+  | 'home'
+  | 'travel'
+  | 'marmaris'
+  | 'movies'
+  | 'fortnite'
+  | 'tasks'
+  | 'comms'
+  | 'settings'
 
 interface NavItem {
   id: ViewId
@@ -16,6 +33,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'travel', label: 'TRAVEL', code: 'FLGT', Icon: IconPlane },
   { id: 'marmaris', label: 'MARMARIS', code: 'GEO', Icon: IconPin },
   { id: 'movies', label: 'MOVIES', code: 'ENT', Icon: IconFilm },
+  { id: 'fortnite', label: 'FORTNITE', code: 'GAME', Icon: IconTrophy },
+  { id: 'tasks', label: 'TASKS', code: 'TSK', Icon: IconChecklist },
   { id: 'comms', label: 'TONY COMMS', code: 'COM', Icon: IconComms },
   { id: 'settings', label: 'SETTINGS', code: 'SYS', Icon: IconSettings },
 ]
@@ -23,11 +42,12 @@ export const NAV_ITEMS: NavItem[] = [
 export function NavRail({
   active,
   onSelect,
-  unread = 0,
+  badges = {},
 }: {
   active: ViewId
   onSelect: (id: ViewId) => void
-  unread?: number
+  /** Per-view unread/open counts — shown as a small pulsing badge on the icon. */
+  badges?: Partial<Record<ViewId, number>>
 }) {
   const { calm, cue } = useSystem()
 
@@ -38,14 +58,14 @@ export function NavRail({
         initial={{ x: -80, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
-        className="sticky top-[3.25rem] z-40 hidden h-[calc(100vh-3.25rem)] w-[5.4rem] shrink-0 flex-col items-center gap-1.5 border-r border-cyan/12 bg-void/50 py-4 backdrop-blur-sm lg:flex"
+        className="sticky top-[3.25rem] z-40 hidden h-[calc(100vh-3.25rem)] w-[5.4rem] shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-cyan/12 bg-void/50 py-4 backdrop-blur-sm lg:flex"
       >
         {NAV_ITEMS.map((item, i) => (
           <RailButton
             key={item.id}
             item={item}
             active={active === item.id}
-            badge={item.id === 'comms' ? unread : 0}
+            badge={badges[item.id] ?? 0}
             delay={i * 0.05}
             onClick={() => {
               if (active !== item.id) cue('nav')
@@ -79,7 +99,7 @@ export function NavRail({
             key={item.id}
             item={item}
             active={active === item.id}
-            badge={item.id === 'comms' ? unread : 0}
+            badge={badges[item.id] ?? 0}
             onClick={() => {
               if (active !== item.id) cue('nav')
               onSelect(item.id)

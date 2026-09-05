@@ -94,3 +94,20 @@ export const IconWeather = ({ className, size = 18 }: IconProps) => (
     <path d="M11 19.5h7.5a2.5 2.5 0 0 0 0-5 3.8 3.8 0 0 0-7.2-1 2.9 2.9 0 0 0-.3 6z" />
   </svg>
 )
+
+export const IconChecklist = ({ className, size = 20 }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M4 6.5l1.5 1.5L8 5.5" />
+    <path d="M4 12.5l1.5 1.5L8 11.5" />
+    <path d="M4 18.5l1.5 1.5L8 17.5" />
+    <path d="M11 6.5h9M11 12.5h9M11 18.5h9" />
+  </svg>
+)
+
+export const IconTrophy = ({ className, size = 20 }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M7 4h10v5a5 5 0 0 1-10 0V4z" />
+    <path d="M7 5.5H4a3 3 0 0 0 3 4.5M17 5.5h3a3 3 0 0 1-3 4.5" />
+    <path d="M12 14v3M9 21h6M9.5 21c0-2 1-3 2.5-4 1.5 1 2.5 2 2.5 4" />
+  </svg>
+)

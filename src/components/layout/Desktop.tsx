@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSystem } from '../../state/SystemProvider'
 import { useComms } from '../../state/useComms'
+import { useTodos } from '../../state/useTodos'
 import { TRIP } from '../../lib/config'
 import { calmViewVariants, viewVariants } from '../../lib/motion'
 import type { JarvisSession } from '../../lib/auth'
@@ -11,6 +12,8 @@ import { HomeView } from '../../views/HomeView'
 import { TravelView } from '../../views/TravelView'
 import { MarmarisView } from '../../views/MarmarisView'
 import { MoviesView } from '../../views/MoviesView'
+import { FortniteView } from '../../views/FortniteView'
+import { TasksView } from '../../views/TasksView'
 import { CommsView } from '../../views/CommsView'
 import { SettingsView } from '../../views/SettingsView'
 import { ArrivalSequence } from '../travel/ArrivalSequence'
@@ -21,6 +24,8 @@ const VIEW_TITLE: Record<ViewId, string> = {
   travel: 'TRAVEL OPERATIONS',
   marmaris: 'MARMARIS INTEL',
   movies: 'ENTERTAINMENT INDEX',
+  fortnite: 'FORTNITE TRACKER',
+  tasks: 'REMINDER LOG',
   comms: 'PRIVATE CHANNEL',
   settings: 'SYSTEM CONFIGURATION',
 }
@@ -57,6 +62,7 @@ export function Desktop({
 }) {
   const { phase, calm, cue, pushLog } = useSystem()
   const comms = useComms()
+  const { open: openTasks } = useTodos()
   const [view, setView] = useState<ViewId>('home')
   const [cinematic, setCinematic] = useState<'none' | 'flight' | 'arrival'>('none')
   const lastPhase = useRef(phase)
@@ -93,7 +99,11 @@ export function Desktop({
       <AnimatePresence>{flightStrip && <FlightModeStrip inFlight={phase === 'in_flight'} />}</AnimatePresence>
 
       <div className="flex">
-        <NavRail active={view} onSelect={select} unread={comms.unread} />
+        <NavRail
+          active={view}
+          onSelect={select}
+          badges={{ comms: comms.unread, tasks: openTasks.length }}
+        />
 
         <main className="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 lg:pb-8">
           {/* breadcrumb / module header */}
@@ -138,6 +148,8 @@ export function Desktop({
               {view === 'travel' && <TravelView />}
               {view === 'marmaris' && <MarmarisView />}
               {view === 'movies' && <MoviesView onOpenSettings={() => select('settings')} />}
+              {view === 'fortnite' && <FortniteView />}
+              {view === 'tasks' && <TasksView />}
               {view === 'comms' && <CommsView comms={comms} />}
               {view === 'settings' && (
                 <SettingsView
