@@ -30,13 +30,13 @@ export const REGION_LABEL: Record<Region, string> = {
  * which is why a cup can be live in one region and hours away in another.
  */
 const REGION_START_UTC: Record<Region, number> = {
-  ASIA: 9,
   OCE: 7,
-  ME: 13,
-  EU: 16,
-  BR: 20,
-  NAC: 22,
-  NAW: 24, // rolls into the next day
+  ASIA: 9,
+  EU: 12, // 14:00 in Marmaris-adjacent CEST — the slot Ali actually sees
+  ME: 14,
+  BR: 19,
+  NAC: 21,
+  NAW: 23,
 }
 
 export interface CupTemplate {
@@ -49,6 +49,9 @@ export interface CupTemplate {
   prize: string
   /** Regions this format runs in. */
   regions: Region[]
+  /** Hours after the region's first slot. Two cups on the same day don't
+   *  start together — the later one runs after the first block. */
+  hourOffset?: number
 }
 
 export const CUP_TEMPLATES: CupTemplate[] = [
@@ -78,6 +81,7 @@ export const CUP_TEMPLATES: CupTemplate[] = [
     durationHours: 3,
     prize: 'Ranked-Belohnungen',
     regions: REGIONS,
+    hourOffset: 4,
   },
   {
     id: 'console-zb-solo',
@@ -132,6 +136,47 @@ export const CUP_TEMPLATES: CupTemplate[] = [
     durationHours: 4,
     prize: 'FNCS-Punkte',
     regions: ['EU', 'NAC', 'NAW', 'BR', 'ASIA', 'OCE', 'ME'],
+    hourOffset: 8,
+  },
+  {
+    id: 'trio-cash',
+    name: 'Trios Cash Cup',
+    format: 'Trios · Battle Royale',
+    weekday: 4,
+    durationHours: 3,
+    prize: 'Preisgeld',
+    regions: ['EU', 'NAC', 'NAW', 'BR', 'ASIA', 'OCE', 'ME'],
+    hourOffset: 4,
+  },
+  {
+    id: 'zb-duo-cash',
+    name: 'Zero Build Duos Cash Cup',
+    format: 'Duos · Zero Build',
+    weekday: 3,
+    durationHours: 3,
+    prize: 'Preisgeld',
+    regions: ['EU', 'NAC', 'NAW', 'BR', 'OCE'],
+    hourOffset: 4,
+  },
+  {
+    id: 'solo-victory-late',
+    name: 'Solo Victory Cup',
+    format: 'Solo · Battle Royale · Spätblock',
+    weekday: 5,
+    durationHours: 3,
+    prize: 'Victory Umbrella',
+    regions: REGIONS,
+    hourOffset: 4,
+  },
+  {
+    id: 'reload-quick',
+    name: 'Reload Quick Cup',
+    format: 'Solo · Reload',
+    weekday: 0,
+    durationHours: 3,
+    prize: 'Ranked-Belohnungen',
+    regions: REGIONS,
+    hourOffset: 4,
   },
 ]
 
@@ -178,7 +223,7 @@ export function getCupSchedule(
       if (!regions.includes(region)) continue
       let start = occurrenceOnOrAfter(
         template.weekday,
-        REGION_START_UTC[region],
+        REGION_START_UTC[region] + (template.hourOffset ?? 0),
         new Date(now.getTime() - 7 * 86_400_000),
       )
       while (start.getTime() < horizon) {
@@ -202,6 +247,6 @@ export function getCupSchedule(
   const nowMs = now.getTime()
   return {
     live: events.filter((e) => e.start.getTime() <= nowMs && e.end.getTime() >= nowMs),
-    upcoming: events.filter((e) => e.start.getTime() > nowMs).slice(0, 12),
+    upcoming: events.filter((e) => e.start.getTime() > nowMs).slice(0, 40),
   }
 }

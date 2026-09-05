@@ -59,6 +59,8 @@ export interface Settings {
   phaseOverride: FlightPhase | null
   /** Operator's own TMDB key — see src/lib/tmdb.ts. Never shipped, never sent anywhere but themoviedb.org. */
   tmdbApiKey: string | null
+  /** Operator's own fortniteapi.io key — see src/lib/fortniteEvents.ts. Sent only to fortniteapi.io. */
+  fortniteApiKey: string | null
 }
 
 export type LogLevel = 'info' | 'ok' | 'warn' | 'core'
@@ -134,6 +136,7 @@ function defaultSettings(): Settings {
     quality: 'auto',
     phaseOverride: null,
     tmdbApiKey: null,
+    fortniteApiKey: null,
   }
 }
 

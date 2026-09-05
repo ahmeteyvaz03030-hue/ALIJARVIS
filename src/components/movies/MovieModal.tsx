@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { useSystem } from '../../state/SystemProvider'
 import { EASE } from '../../lib/motion'
 import type { Movie } from '../../data/movies'
-import { loadDetail, type TmdbDetailView } from '../../lib/tmdb'
+import { fetchStills, loadDetail, type TmdbDetailView, type TmdbStill } from '../../lib/tmdb'
+import { useWatchlist } from '../../state/useWatchlist'
 import { HudButton } from '../hud/HudButton'
 import { PosterArt, PosterImage } from './PosterArt'
 import { ActiveScan } from '../fx/ScanLine'
@@ -77,7 +78,8 @@ function TrailerOverlay({
               className="h-full w-full border-0"
             />
           </div>
-          {!calm && <ActiveScan />}
+          {/* Deliberately no scan overlay here: compositing an animated layer
+              on top of decoding video is what made the trailer stutter. */}
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-cyan/20 bg-void/90 px-4 py-3">
@@ -209,17 +211,23 @@ function TrailerOverlay({
 export function MovieModal({
   movie,
   apiKey = null,
+  mediaType = 'movie',
   onClose,
 }: {
   movie: Movie
   /** When set and `movie.tmdbId` is present, fetches runtime/tagline/trailer on open. */
   apiKey?: string | null
+  mediaType?: 'movie' | 'tv'
   onClose: () => void
 }) {
   const { calm, cue, pushLog } = useSystem()
+  const watchlist = useWatchlist()
   const [trailer, setTrailer] = useState(false)
   const [detail, setDetail] = useState<TmdbDetailView | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [stills, setStills] = useState<TmdbStill[]>([])
+  const [lightbox, setLightbox] = useState<number | null>(null)
+  const saved = watchlist.has(movie.id)
 
   // TMDB's list endpoints don't carry runtime, tagline or trailers — only
   // the detail endpoint does, so it's fetched lazily right when the
@@ -238,6 +246,19 @@ export function MovieModal({
       cancelled = true
     }
   }, [apiKey, movie.tmdbId, pushLog])
+
+  // Scene stills load separately so a slow/empty images response never holds
+  // up the runtime and trailer information.
+  useEffect(() => {
+    if (!apiKey || !movie.tmdbId) return
+    let cancelled = false
+    void fetchStills(apiKey, movie.tmdbId, mediaType).then((result) => {
+      if (!cancelled) setStills(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [apiKey, movie.tmdbId, mediaType])
 
   const runtime = detail?.runtime || movie.runtime
   const tagline = detail?.tagline || movie.tagline
@@ -264,7 +285,9 @@ export function MovieModal({
       transition={{ duration: 0.25 }}
     >
       <motion.div
-        className="absolute inset-0 bg-void/85 backdrop-blur-md"
+        // The blur is dropped while a trailer plays: re-blurring everything
+        // behind a decoding video costs a full-screen pass per frame.
+        className={`absolute inset-0 ${trailer ? 'bg-void/95' : 'bg-void/85 backdrop-blur-md'}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -281,6 +304,54 @@ export function MovieModal({
         <AnimatePresence>
           {trailer && (
             <TrailerOverlay movie={movie} trailerKey={trailerKey} onClose={() => setTrailer(false)} />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {lightbox !== null && stills[lightbox] && (
+            <motion.div
+              className="absolute inset-0 z-30 flex flex-col bg-void"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setLightbox(null)}
+            >
+              <img
+                src={stills[lightbox].url}
+                alt=""
+                className="min-h-0 flex-1 object-contain"
+              />
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-cyan/20 px-4 py-2.5">
+                <span className="font-mono text-[0.55rem] tracking-[0.18em] text-cyan/50">
+                  SZENE {lightbox + 1} / {stills.length}
+                </span>
+                <div className="flex gap-2">
+                  <HudButton
+                    small
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setLightbox((i) => ((i ?? 0) - 1 + stills.length) % stills.length)
+                    }}
+                  >
+                    ‹
+                  </HudButton>
+                  <HudButton
+                    small
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setLightbox((i) => ((i ?? 0) + 1) % stills.length)
+                    }}
+                  >
+                    ›
+                  </HudButton>
+                  <HudButton small variant="ghost" onClick={() => setLightbox(null)}>
+                    Schließen
+                  </HudButton>
+                </div>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
 
@@ -344,6 +415,27 @@ export function MovieModal({
               {movie.synopsis}
             </motion.p>
 
+            {stills.length > 0 && (
+              <div className="mt-4">
+                <div className="hud-label mb-1.5">Szenenbilder</div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {stills.map((still, i) => (
+                    <button
+                      key={still.thumbUrl}
+                      type="button"
+                      onClick={() => {
+                        cue('panel')
+                        setLightbox(i)
+                      }}
+                      className="h-16 w-28 shrink-0 cursor-zoom-in overflow-hidden border border-cyan/18 transition-colors hover:border-cyan/60"
+                    >
+                      <img src={still.thumbUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -359,6 +451,15 @@ export function MovieModal({
                 }}
               >
                 {trailerKey ? 'Trailer starten' : 'Trailer starten (simuliert)'}
+              </HudButton>
+              <HudButton
+                variant={saved ? 'default' : 'ghost'}
+                onClick={() => {
+                  cue(saved ? 'nav' : 'confirm')
+                  watchlist.toggle(movie, mediaType)
+                }}
+              >
+                {saved ? '★ Gemerkt' : '+ Später ansehen'}
               </HudButton>
               <HudButton variant="ghost" onClick={onClose}>
                 Zurück

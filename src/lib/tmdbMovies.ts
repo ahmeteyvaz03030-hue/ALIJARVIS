@@ -1,6 +1,6 @@
 import type { Movie, PosterArt } from '../data/movies'
 import { seeded } from './motion'
-import { posterUrl, type TmdbListItem } from './tmdb'
+import { posterUrl, type TmdbListItem, type TmdbTvItem } from './tmdb'
 
 const ART_POOL: PosterArt[] = ['rings', 'grid', 'sun', 'wave', 'monolith']
 
@@ -39,6 +39,32 @@ export function movieFromTmdb(
     title: item.title.toUpperCase(),
     year: item.release_date ? new Date(item.release_date).getFullYear() : 0,
     genre: genre || 'FILM',
+    runtime: 0,
+    rating: item.vote_average,
+    tagline: '',
+    synopsis: item.overview || 'Keine Beschreibung verfügbar.',
+    palette,
+    art,
+    status: badge,
+    posterUrl: posterUrl(item.poster_path, 'w342'),
+  }
+}
+
+
+/** Maps a TMDB series entry into the same Movie shape the grid renders. */
+export function movieFromTmdbTv(
+  item: TmdbTvItem,
+  genreMap: Record<number, string>,
+  badge: string,
+): Movie {
+  const { art, palette } = fallbackLook(item.id + 500_000)
+  const genre = item.genre_ids.map((id) => genreMap[id]).filter(Boolean).slice(0, 2).join(' / ')
+  return {
+    id: `tmdbtv-${item.id}`,
+    tmdbId: item.id,
+    title: item.name.toUpperCase(),
+    year: item.first_air_date ? new Date(item.first_air_date).getFullYear() : 0,
+    genre: genre || 'SERIE',
     runtime: 0,
     rating: item.vote_average,
     tagline: '',

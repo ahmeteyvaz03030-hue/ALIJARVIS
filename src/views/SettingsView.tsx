@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useSystem, type MotionPreference, type Quality } from '../state/SystemProvider'
 import { FLIGHT_PHASES, PHASE_LABEL, type FlightPhase } from '../lib/config'
 import { authProvider, type JarvisSession } from '../lib/auth'
 import { EASE } from '../lib/motion'
 import { validateApiKey } from '../lib/tmdb'
+import { validateIoKey } from '../lib/fortniteEvents'
 import { HoloCard } from '../components/hud/HoloCard'
 import { HudButton } from '../components/hud/HudButton'
 import { StatusPill } from '../components/hud/Readout'
@@ -12,45 +13,81 @@ import { StatusPill } from '../components/hud/Readout'
 
 type KeyStatus = 'saved' | 'none' | 'checking' | 'valid' | 'invalid' | 'unreachable'
 
-function TmdbKeyCard({ index }: { index: number }) {
+/** Which stored key a card edits — both are plain strings in Settings. */
+type KeySetting = 'tmdbApiKey' | 'fortniteApiKey'
+
+interface ApiKeyCardProps {
+  index: number
+  setting: KeySetting
+  tone: 'violet' | 'cyan' | 'lime' | 'amber' | 'danger'
+  title: string
+  badge: string
+  /** Human name of the service, used in log lines and the "unreachable" pill. */
+  service: string
+  inputLabel: string
+  description: ReactNode
+  connectedNote: string
+  disconnectedNote: string
+  validate: (key: string) => Promise<{ ok: boolean; code?: string; message?: string }>
+}
+
+/**
+ * Bring-your-own-key card. The key never leaves this browser except as a
+ * request to the service it belongs to; it is stored in localStorage with the
+ * rest of the settings and is never sent to RonalJarvis itself.
+ */
+function ApiKeyCard({
+  index,
+  setting,
+  tone,
+  title,
+  badge,
+  service,
+  inputLabel,
+  description,
+  connectedNote,
+  disconnectedNote,
+  validate,
+}: ApiKeyCardProps) {
   const { settings, patchSettings, pushLog, cue } = useSystem()
-  const [draft, setDraft] = useState(settings.tmdbApiKey ?? '')
+  const stored = settings[setting]
+  const [draft, setDraft] = useState(stored ?? '')
   const [reveal, setReveal] = useState(false)
-  const [status, setStatus] = useState<KeyStatus>(settings.tmdbApiKey ? 'saved' : 'none')
+  const [status, setStatus] = useState<KeyStatus>(stored ? 'saved' : 'none')
 
   const handleSave = async () => {
     const key = draft.trim()
     if (!key) {
-      patchSettings({ tmdbApiKey: null })
+      patchSettings({ [setting]: null })
       setStatus('none')
       cue('nav')
       return
     }
     setStatus('checking')
     cue('process')
-    const result = await validateApiKey(key)
+    const result = await validate(key)
     if (result.ok) {
-      patchSettings({ tmdbApiKey: key })
+      patchSettings({ [setting]: key })
       setStatus('valid')
       cue('confirm')
-      pushLog('TMDB-Schlüssel verbunden', 'ok')
+      pushLog(`${service}-Schlüssel verbunden`, 'ok')
     } else if (result.code === 'NETWORK') {
-      // Not a bad key — TMDB just wasn't reachable right now. Save it anyway
-      // so the entertainment module can retry once the network is back.
-      patchSettings({ tmdbApiKey: key })
+      // Not a bad key — the service just wasn't reachable right now. Save it
+      // anyway so the module can retry once the network is back.
+      patchSettings({ [setting]: key })
       setStatus('unreachable')
       cue('deny')
-      pushLog(`TMDB nicht erreichbar: ${result.message}`, 'warn')
+      pushLog(`${service} nicht erreichbar: ${result.message ?? ''}`, 'warn')
     } else {
       setStatus('invalid')
       cue('deny')
-      pushLog(`TMDB-Schlüssel abgelehnt: ${result.message}`, 'warn')
+      pushLog(`${service}-Schlüssel abgelehnt: ${result.message ?? ''}`, 'warn')
     }
   }
 
   const handleClear = () => {
     setDraft('')
-    patchSettings({ tmdbApiKey: null })
+    patchSettings({ [setting]: null })
     setStatus('none')
     cue('nav')
   }
@@ -63,28 +100,23 @@ function TmdbKeyCard({ index }: { index: number }) {
         : status === 'invalid'
           ? { tone: 'danger' as const, label: 'UNGÜLTIG' }
           : status === 'unreachable'
-            ? { tone: 'amber' as const, label: 'TMDB NICHT ERREICHBAR' }
+            ? { tone: 'amber' as const, label: `${service.toUpperCase()} NICHT ERREICHBAR` }
             : { tone: 'cyan' as const, label: 'NICHT VERBUNDEN' }
 
+  const inputId = `key-${setting}`
+
   return (
-    <HoloCard index={index} tone="violet" title="Entertainment Data Source" status="TMDB" className="lg:col-span-12">
-      <p className="mb-4 max-w-2xl text-[0.8rem] leading-relaxed text-ice/65">
-        Mit einem eigenen, kostenlosen TMDB-Schlüssel lädt das Entertainment-Modul echte,
-        aktuelle Kinofilme samt Suche, statt der Offline-Demo-Bibliothek. Der Schlüssel bleibt
-        ausschließlich in diesem Browser (lokal gespeichert) und wird nur direkt an
-        themoviedb.org gesendet — nie an RonalJarvis selbst oder sonst irgendwohin. Einen freien
-        Schlüssel gibt es unter themoviedb.org/settings/api (v3 „API Key" oder v4 „Read Access
-        Token" — beide funktionieren hier).
-      </p>
+    <HoloCard index={index} tone={tone} title={title} status={badge} className="lg:col-span-12">
+      <p className="mb-4 max-w-2xl text-[0.8rem] leading-relaxed text-ice/65">{description}</p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="hud-label mb-1.5 block" htmlFor="tmdb-key">
-            TMDB API-Schlüssel
+          <label className="hud-label mb-1.5 block" htmlFor={inputId}>
+            {inputLabel}
           </label>
           <div className="relative">
             <input
-              id="tmdb-key"
+              id={inputId}
               type={reveal ? 'text' : 'password'}
               value={draft}
               onChange={(e) => {
@@ -111,7 +143,7 @@ function TmdbKeyCard({ index }: { index: number }) {
           <HudButton variant="primary" busy={status === 'checking'} onClick={() => void handleSave()}>
             Speichern & prüfen
           </HudButton>
-          {settings.tmdbApiKey && (
+          {stored && (
             <HudButton variant="ghost" onClick={handleClear}>
               Entfernen
             </HudButton>
@@ -122,12 +154,65 @@ function TmdbKeyCard({ index }: { index: number }) {
       <div className="mt-4 flex items-center gap-2 border-t border-violet/12 pt-4">
         <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
         <span className="font-mono text-[0.58rem] tracking-[0.16em] text-cyan/45">
-          {settings.tmdbApiKey
-            ? 'Entertainment-Modul lädt echte Kinofilme'
-            : 'Entertainment-Modul zeigt die Offline-Demo-Bibliothek'}
+          {stored ? connectedNote : disconnectedNote}
         </span>
       </div>
     </HoloCard>
+  )
+}
+
+function TmdbKeyCard({ index }: { index: number }) {
+  return (
+    <ApiKeyCard
+      index={index}
+      setting="tmdbApiKey"
+      tone="violet"
+      title="Entertainment Data Source"
+      badge="TMDB"
+      service="TMDB"
+      inputLabel="TMDB API-Schlüssel"
+      validate={validateApiKey}
+      connectedNote="Entertainment-Modul lädt echte Filme, Serien und Schauspieler"
+      disconnectedNote="Entertainment-Modul zeigt die Offline-Demo-Bibliothek"
+      description={
+        <>
+          Mit einem eigenen, kostenlosen TMDB-Schlüssel lädt das Entertainment-Modul echte,
+          aktuelle Kinofilme, Serien, Szenenbilder und Schauspieler-Profile samt Suche, statt der
+          Offline-Demo-Bibliothek. Der Schlüssel bleibt ausschließlich in diesem Browser (lokal
+          gespeichert) und wird nur direkt an themoviedb.org gesendet — nie an RonalJarvis selbst
+          oder sonst irgendwohin. Einen freien Schlüssel gibt es unter
+          themoviedb.org/settings/api (v3 „API Key" oder v4 „Read Access Token" — beide
+          funktionieren hier).
+        </>
+      }
+    />
+  )
+}
+
+function FortniteKeyCard({ index }: { index: number }) {
+  return (
+    <ApiKeyCard
+      index={index}
+      setting="fortniteApiKey"
+      tone="lime"
+      title="Competitive Data Source"
+      badge="FORTNITEAPI.IO"
+      service="fortniteapi.io"
+      inputLabel="fortniteapi.io API-Schlüssel"
+      validate={validateIoKey}
+      connectedNote="Fortnite-Modul lädt echte Turnierfenster und Spielerstatistiken"
+      disconnectedNote="Fortnite-Modul zeigt den generierten Schätzkalender"
+      description={
+        <>
+          Epic veröffentlicht keinen offenen Turnierkalender. fortniteapi.io spiegelt Epics
+          Event-Fenster und Spielerstatistiken über eine dokumentierte, kostenlose
+          Schnittstelle — mit einem eigenen Schlüssel (fortniteapi.io/register) zeigt das
+          Fortnite-Modul die echten Cups statt der Schätzung und kann Spieler per Epic-Name
+          nachschlagen. Der Schlüssel bleibt ausschließlich in diesem Browser und wird nur
+          direkt an fortniteapi.io gesendet.
+        </>
+      }
+    />
   )
 }
 
@@ -152,7 +237,9 @@ function Row({
           </div>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">{children}</div>
+      {/* min-w-0 + wrap: the phase row is six buttons wide and has to break
+          onto a second line on a phone instead of widening the page. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">{children}</div>
     </div>
   )
 }
@@ -323,9 +410,12 @@ export function SettingsView({
       {/* --------------------------------------------------- entertainment data */}
       <TmdbKeyCard index={2} />
 
+      {/* ----------------------------------------------------- competitive data */}
+      <FortniteKeyCard index={3} />
+
       {/* ---------------------------------------------------------- simulation */}
       <HoloCard
-        index={3}
+        index={4}
         tone="amber"
         title="Mission Simulation"
         status="DEMO"

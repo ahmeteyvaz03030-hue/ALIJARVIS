@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useSystem } from '../../state/SystemProvider'
 import { useHoloTilt } from '../../lib/hooks'
 import { calmPanelVariants, panelVariants } from '../../lib/motion'
+import { useWatchlist } from '../../state/useWatchlist'
 import { MOVIES, statusTone, type Movie } from '../../data/movies'
 import { PosterImage } from './PosterArt'
 import { MovieModal } from './MovieModal'
@@ -10,29 +11,38 @@ import { MovieModal } from './MovieModal'
 function PosterCard({
   movie,
   index,
+  mediaType,
   onOpen,
 }: {
   movie: Movie
   index: number
+  mediaType: 'movie' | 'tv'
   onOpen: () => void
 }) {
   const { calm, cue } = useSystem()
+  const watchlist = useWatchlist()
   const tilt = useHoloTilt(8, !calm)
   const rgb = statusTone(movie.status)
+  const saved = watchlist.has(movie.id)
 
   return (
-    <motion.button
-      type="button"
+    <motion.div
       variants={calm ? calmPanelVariants : panelVariants}
       custom={index}
-      onClick={() => {
-        cue('confirm')
-        onOpen()
-      }}
-      onPointerEnter={() => cue('panel')}
-      className="group/holo relative block text-left"
-      style={{ perspective: 900 }}
+      className="group/holo relative"
     >
+      {/* The whole poster is the open-details control; the watchlist toggle is a
+          sibling on top of it, never nested inside another button. */}
+      <button
+        type="button"
+        onClick={() => {
+          cue('confirm')
+          onOpen()
+        }}
+        onPointerEnter={() => cue('panel')}
+        className="block w-full text-left"
+        style={{ perspective: 900 }}
+      >
       <motion.div
         layoutId={calm ? undefined : `poster-${movie.id}`}
         ref={tilt.ref}
@@ -94,7 +104,7 @@ function PosterCard({
         </span>
 
         {/* rating */}
-        <span className="absolute right-2 top-2 flex items-center gap-1 border border-cyan/25 bg-void/70 px-1.5 py-0.5 font-mono text-[0.5rem] text-ice">
+        <span className="absolute right-2 top-8 flex items-center gap-1 border border-cyan/25 bg-void/70 px-1.5 py-0.5 font-mono text-[0.5rem] text-ice">
           ★ {movie.rating.toFixed(1)}
         </span>
 
@@ -120,18 +130,40 @@ function PosterCard({
           </div>
         </div>
       </motion.div>
-    </motion.button>
+      </button>
+
+      {/* watchlist toggle — sits above the poster, outside its button */}
+      <button
+        type="button"
+        aria-label={saved ? 'Von der Merkliste entfernen' : 'Zur Merkliste hinzufügen'}
+        title={saved ? 'Von der Merkliste entfernen' : 'Später ansehen'}
+        onClick={() => {
+          cue(saved ? 'nav' : 'confirm')
+          watchlist.toggle(movie, mediaType)
+        }}
+        className="absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center border text-[0.6rem] leading-none transition-colors"
+        style={{
+          borderColor: saved ? 'rgba(255,181,77,0.8)' : 'rgba(53,230,255,0.3)',
+          background: saved ? 'rgba(255,181,77,0.18)' : 'rgba(4,8,13,0.7)',
+          color: saved ? '#ffb54d' : 'rgba(182,244,255,0.7)',
+        }}
+      >
+        {saved ? '★' : '+'}
+      </button>
+    </motion.div>
   )
 }
 
 export function MovieGrid({
   movies = MOVIES,
   apiKey = null,
+  mediaType = 'movie',
 }: {
   /** Defaults to the offline demo library when no list is supplied. */
   movies?: Movie[]
   /** Lets the modal fetch full detail (runtime, tagline, trailer) for TMDB-backed movies. */
   apiKey?: string | null
+  mediaType?: 'movie' | 'tv'
 }) {
   const [selected, setSelected] = useState<Movie | null>(null)
   const { pushLog } = useSystem()
@@ -149,6 +181,7 @@ export function MovieGrid({
             key={movie.id}
             movie={movie}
             index={i}
+            mediaType={mediaType}
             onOpen={() => {
               setSelected(movie)
               pushLog(`Entertainment index → ${movie.title}`, 'info')
@@ -163,6 +196,7 @@ export function MovieGrid({
             key={selected.id}
             movie={selected}
             apiKey={apiKey}
+            mediaType={mediaType}
             onClose={() => setSelected(null)}
           />
         )}
