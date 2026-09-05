@@ -1,11 +1,135 @@
 import { motion } from 'framer-motion'
+import { useState } from 'react'
 import { useSystem, type MotionPreference } from '../state/SystemProvider'
 import { FLIGHT_PHASES, PHASE_LABEL, type FlightPhase } from '../lib/config'
 import { authProvider, type JarvisSession } from '../lib/auth'
 import { EASE } from '../lib/motion'
+import { validateApiKey } from '../lib/tmdb'
 import { HoloCard } from '../components/hud/HoloCard'
 import { HudButton } from '../components/hud/HudButton'
 import { StatusPill } from '../components/hud/Readout'
+
+
+type KeyStatus = 'saved' | 'none' | 'checking' | 'valid' | 'invalid' | 'unreachable'
+
+function TmdbKeyCard({ index }: { index: number }) {
+  const { settings, patchSettings, pushLog, cue } = useSystem()
+  const [draft, setDraft] = useState(settings.tmdbApiKey ?? '')
+  const [reveal, setReveal] = useState(false)
+  const [status, setStatus] = useState<KeyStatus>(settings.tmdbApiKey ? 'saved' : 'none')
+
+  const handleSave = async () => {
+    const key = draft.trim()
+    if (!key) {
+      patchSettings({ tmdbApiKey: null })
+      setStatus('none')
+      cue('nav')
+      return
+    }
+    setStatus('checking')
+    cue('process')
+    const result = await validateApiKey(key)
+    if (result.ok) {
+      patchSettings({ tmdbApiKey: key })
+      setStatus('valid')
+      cue('confirm')
+      pushLog('TMDB-Schlüssel verbunden', 'ok')
+    } else if (result.code === 'NETWORK') {
+      // Not a bad key — TMDB just wasn't reachable right now. Save it anyway
+      // so the entertainment module can retry once the network is back.
+      patchSettings({ tmdbApiKey: key })
+      setStatus('unreachable')
+      cue('deny')
+      pushLog(`TMDB nicht erreichbar: ${result.message}`, 'warn')
+    } else {
+      setStatus('invalid')
+      cue('deny')
+      pushLog(`TMDB-Schlüssel abgelehnt: ${result.message}`, 'warn')
+    }
+  }
+
+  const handleClear = () => {
+    setDraft('')
+    patchSettings({ tmdbApiKey: null })
+    setStatus('none')
+    cue('nav')
+  }
+
+  const pill =
+    status === 'valid' || status === 'saved'
+      ? { tone: 'lime' as const, label: status === 'valid' ? 'VERBUNDEN' : 'GESPEICHERT' }
+      : status === 'checking'
+        ? { tone: 'amber' as const, label: 'PRÜFE...' }
+        : status === 'invalid'
+          ? { tone: 'danger' as const, label: 'UNGÜLTIG' }
+          : status === 'unreachable'
+            ? { tone: 'amber' as const, label: 'TMDB NICHT ERREICHBAR' }
+            : { tone: 'cyan' as const, label: 'NICHT VERBUNDEN' }
+
+  return (
+    <HoloCard index={index} tone="violet" title="Entertainment Data Source" status="TMDB" className="lg:col-span-12">
+      <p className="mb-4 max-w-2xl text-[0.8rem] leading-relaxed text-ice/65">
+        Mit einem eigenen, kostenlosen TMDB-Schlüssel lädt das Entertainment-Modul echte,
+        aktuelle Kinofilme samt Suche, statt der Offline-Demo-Bibliothek. Der Schlüssel bleibt
+        ausschließlich in diesem Browser (lokal gespeichert) und wird nur direkt an
+        themoviedb.org gesendet — nie an RonalJarvis selbst oder sonst irgendwohin. Einen freien
+        Schlüssel gibt es unter themoviedb.org/settings/api (v3 „API Key" oder v4 „Read Access
+        Token" — beide funktionieren hier).
+      </p>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label className="hud-label mb-1.5 block" htmlFor="tmdb-key">
+            TMDB API-Schlüssel
+          </label>
+          <div className="relative">
+            <input
+              id="tmdb-key"
+              type={reveal ? 'text' : 'password'}
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value)
+                // Editing invalidates whatever the last check said.
+                setStatus('none')
+              }}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="•••••••••••••••••••••••••••••••"
+              className="hud-input pr-16 text-left text-[0.82rem]"
+              style={{ letterSpacing: 'normal' }}
+            />
+            <button
+              type="button"
+              onClick={() => setReveal((r) => !r)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[0.55rem] tracking-[0.14em] text-cyan/50 hover:text-cyan"
+            >
+              {reveal ? 'VERBERGEN' : 'ANZEIGEN'}
+            </button>
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <HudButton variant="primary" busy={status === 'checking'} onClick={() => void handleSave()}>
+            Speichern & prüfen
+          </HudButton>
+          {settings.tmdbApiKey && (
+            <HudButton variant="ghost" onClick={handleClear}>
+              Entfernen
+            </HudButton>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2 border-t border-violet/12 pt-4">
+        <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
+        <span className="font-mono text-[0.58rem] tracking-[0.16em] text-cyan/45">
+          {settings.tmdbApiKey
+            ? 'Entertainment-Modul lädt echte Kinofilme'
+            : 'Entertainment-Modul zeigt die Offline-Demo-Bibliothek'}
+        </span>
+      </div>
+    </HoloCard>
+  )
+}
 
 function Row({
   label,
@@ -180,9 +304,12 @@ export function SettingsView({
         </div>
       </HoloCard>
 
+      {/* --------------------------------------------------- entertainment data */}
+      <TmdbKeyCard index={2} />
+
       {/* ---------------------------------------------------------- simulation */}
       <HoloCard
-        index={2}
+        index={3}
         tone="amber"
         title="Mission Simulation"
         status="DEMO"

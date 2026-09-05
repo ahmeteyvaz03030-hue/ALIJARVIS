@@ -137,7 +137,7 @@ export function Desktop({
               {view === 'home' && <HomeView session={session} />}
               {view === 'travel' && <TravelView />}
               {view === 'marmaris' && <MarmarisView />}
-              {view === 'movies' && <MoviesView />}
+              {view === 'movies' && <MoviesView onOpenSettings={() => select('settings')} />}
               {view === 'comms' && <CommsView comms={comms} />}
               {view === 'settings' && (
                 <SettingsView

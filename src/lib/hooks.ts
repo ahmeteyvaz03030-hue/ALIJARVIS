@@ -226,3 +226,13 @@ export function usePageVisible(): boolean {
 export function clockStamp(date: Date): string {
   return date.toTimeString().slice(0, 8)
 }
+
+/** Settles on `value` only after it stops changing for `delayMs` — for search inputs. */
+export function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delayMs)
+    return () => window.clearTimeout(timer)
+  }, [value, delayMs])
+  return debounced
+}

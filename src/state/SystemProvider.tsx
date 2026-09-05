@@ -26,6 +26,8 @@ export interface Settings {
   scanlines: boolean
   /** Demo aid: force a mission phase to preview flight/arrival sequences. */
   phaseOverride: FlightPhase | null
+  /** Operator's own TMDB key — see src/lib/tmdb.ts. Never shipped, never sent anywhere but themoviedb.org. */
+  tmdbApiKey: string | null
 }
 
 export type LogLevel = 'info' | 'ok' | 'warn' | 'core'
@@ -97,6 +99,7 @@ function defaultSettings(): Settings {
     // off on a device we've already flagged as tight on headroom.
     scanlines: detectPerfTier() === 'high',
     phaseOverride: null,
+    tmdbApiKey: null,
   }
 }
 

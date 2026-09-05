@@ -3,15 +3,9 @@ import { useState } from 'react'
 import { useSystem } from '../../state/SystemProvider'
 import { useHoloTilt } from '../../lib/hooks'
 import { calmPanelVariants, panelVariants } from '../../lib/motion'
-import { MOVIES, type Movie } from '../../data/movies'
-import { PosterArt } from './PosterArt'
+import { MOVIES, statusTone, type Movie } from '../../data/movies'
+import { PosterImage } from './PosterArt'
 import { MovieModal } from './MovieModal'
-
-const STATUS_TONE: Record<Movie['status'], string> = {
-  QUEUED: '53,230,255',
-  DOWNLOADED: '124,255,155',
-  WATCHING: '255,181,77',
-}
 
 function PosterCard({
   movie,
@@ -24,7 +18,7 @@ function PosterCard({
 }) {
   const { calm, cue } = useSystem()
   const tilt = useHoloTilt(8, !calm)
-  const rgb = STATUS_TONE[movie.status]
+  const rgb = statusTone(movie.status)
 
   return (
     <motion.button
@@ -51,11 +45,10 @@ function PosterCard({
           willChange: 'transform',
         }}
       >
-        {/* base art */}
-        <PosterArt
-          art={movie.art}
-          palette={movie.palette}
-          seed={movie.title.length + index}
+        {/* real poster when TMDB supplied one; procedural art otherwise or on load failure */}
+        <PosterImage
+          movie={movie}
+          index={index}
           className="absolute inset-0 h-full w-full transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/holo:scale-[1.09]"
         />
 
@@ -111,7 +104,7 @@ function PosterCard({
             {movie.title}
           </div>
           <div className="mt-0.5 font-mono text-[0.5rem] tracking-[0.12em] text-cyan/55">
-            {movie.year} · {movie.runtime} MIN
+            {movie.year || '—'}{movie.runtime > 0 ? ` · ${movie.runtime} MIN` : ''}
           </div>
           {/* reveal-on-hover play affordance */}
           <div className="mt-1.5 flex items-center gap-1.5 overflow-hidden">
@@ -131,7 +124,15 @@ function PosterCard({
   )
 }
 
-export function MovieGrid() {
+export function MovieGrid({
+  movies = MOVIES,
+  apiKey = null,
+}: {
+  /** Defaults to the offline demo library when no list is supplied. */
+  movies?: Movie[]
+  /** Lets the modal fetch full detail (runtime, tagline, trailer) for TMDB-backed movies. */
+  apiKey?: string | null
+}) {
   const [selected, setSelected] = useState<Movie | null>(null)
   const { pushLog } = useSystem()
 
@@ -143,7 +144,7 @@ export function MovieGrid() {
         animate="visible"
         transition={{ staggerChildren: 0.05 }}
       >
-        {MOVIES.map((movie, i) => (
+        {movies.map((movie, i) => (
           <PosterCard
             key={movie.id}
             movie={movie}
@@ -161,6 +162,7 @@ export function MovieGrid() {
           <MovieModal
             key={selected.id}
             movie={selected}
+            apiKey={apiKey}
             onClose={() => setSelected(null)}
           />
         )}

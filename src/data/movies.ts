@@ -5,14 +5,34 @@ export interface Movie {
   title: string
   year: number
   genre: string
+  /** 0 means unknown — TMDB list endpoints don't include it, only detail does. */
   runtime: number
   rating: number
   tagline: string
   synopsis: string
+  /** Accent colours for the hover bloom, and the poster if no real image loads. */
   palette: [string, string]
   art: PosterArt
-  /** Watch-together status for the trip. */
-  status: 'QUEUED' | 'DOWNLOADED' | 'WATCHING'
+  /** Free-form badge text: QUEUED/DOWNLOADED/WATCHING for the demo library,
+   *  BELIEBT/IM KINO/SUCHE for TMDB-backed entries. */
+  status: string
+  /** Real poster from TMDB, when this entry is backed by it. */
+  posterUrl?: string | null
+  /** Present only for TMDB-backed movies — lets the modal fetch full detail. */
+  tmdbId?: number
+}
+
+export const STATUS_TONE_RGB: Record<string, string> = {
+  QUEUED: '53,230,255',
+  DOWNLOADED: '124,255,155',
+  WATCHING: '255,181,77',
+  BELIEBT: '53,230,255',
+  'IM KINO': '255,181,77',
+  SUCHE: '169,123,255',
+}
+
+export function statusTone(status: string): string {
+  return STATUS_TONE_RGB[status] ?? '53,230,255'
 }
 
 /**

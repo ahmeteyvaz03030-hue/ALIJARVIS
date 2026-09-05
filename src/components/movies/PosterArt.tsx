@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import type { PosterArt as ArtKind } from '../../data/movies'
+import { useMemo, useState } from 'react'
+import type { Movie, PosterArt as ArtKind } from '../../data/movies'
 import { seeded } from '../../lib/motion'
 
 /**
@@ -143,5 +143,34 @@ export function PosterArt({
       {/* bottom scrim so the title stays readable */}
       <rect x="0" y="78" width="100" height="72" fill={`url(#scrim-${seed})`} />
     </svg>
+  )
+}
+
+
+/** Real TMDB poster when available; falls back to the procedural art above if
+ *  there's no image, or if it fails to load (dead link, offline, blocked). */
+export function PosterImage({
+  movie,
+  index = 0,
+  className = '',
+}: {
+  movie: Movie
+  index?: number
+  className?: string
+}) {
+  const [broken, setBroken] = useState(false)
+  if (movie.posterUrl && !broken) {
+    return (
+      <img
+        src={movie.posterUrl}
+        alt={movie.title}
+        loading="lazy"
+        onError={() => setBroken(true)}
+        className={`${className} object-cover`}
+      />
+    )
+  }
+  return (
+    <PosterArt art={movie.art} palette={movie.palette} seed={movie.title.length + index} className={className} />
   )
 }
