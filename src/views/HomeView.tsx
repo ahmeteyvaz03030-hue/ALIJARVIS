@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useSystem } from '../state/SystemProvider'
+import { useStats, useSystem } from '../state/SystemProvider'
 import { PHASE_LABEL, TRIP } from '../lib/config'
 import { useCountdown } from '../lib/hooks'
 import { JarvisCore } from '../components/core/JarvisCore'
@@ -16,7 +16,7 @@ import type { JarvisSession } from '../lib/auth'
 import { EASE } from '../lib/motion'
 
 export function HomeView({ session }: { session: JarvisSession }) {
-  const { phase, stats, calm } = useSystem()
+  const { phase, calm } = useSystem()
   const countdown = useCountdown(TRIP.departure)
   const flightMode = phase === 'flight_day' || phase === 'in_flight'
 
@@ -53,34 +53,7 @@ export function HomeView({ session }: { session: JarvisSession }) {
           </motion.div>
 
           {/* core vitals — fills the ring's footprint with live readouts */}
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55, duration: 0.6, ease: EASE.out }}
-            className="mt-6 w-full max-w-sm space-y-2.5 border-t border-cyan/10 pt-4"
-          >
-            {[
-              { k: 'HEURISTICS', v: `${stats.cpu}%`, bar: stats.cpu, tone: 'cyan' as const },
-              { k: 'MEMORY SHARDS', v: `${stats.memory}%`, bar: stats.memory, tone: 'cyan' as const },
-              { k: 'UPLINK', v: `${stats.uplink}%`, bar: stats.uplink, tone: 'lime' as const },
-            ].map((row) => (
-              <div key={row.k} className="space-y-1">
-                <div className="flex items-baseline justify-between">
-                  <span className="hud-label">{row.k}</span>
-                  <span className="font-mono text-[0.62rem] tabular-nums text-ice/75">
-                    {row.v}
-                  </span>
-                </div>
-                <SegmentBar value={row.bar} segments={20} tone={row.tone} />
-              </div>
-            ))}
-
-            <div className="flex items-center justify-between pt-1.5 font-mono text-[0.55rem] tracking-[0.16em] text-cyan/40">
-              <span>CORE TEMP {stats.coreTemp}°C</span>
-              <span>PING {stats.ping} MS</span>
-              <span className="jv-blink">● LIVE</span>
-            </div>
-          </motion.div>
+          <CoreVitals />
         </div>
       </HoloCard>
 
@@ -124,7 +97,7 @@ export function HomeView({ session }: { session: JarvisSession }) {
           index={2}
           tone="cyan"
           title="Core Dialogue"
-          status={`${stats.cpu}% LOAD`}
+          status="ONLINE"
           bodyClassName="p-4"
         >
           <JarvisChat />
@@ -218,5 +191,39 @@ export function HomeView({ session }: { session: JarvisSession }) {
         </ul>
       </HoloCard>
     </div>
+  )
+}
+
+
+/** The only part of the home view that follows the 1.8 s telemetry tick. */
+function CoreVitals() {
+  const stats = useStats()
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.55, duration: 0.6, ease: EASE.out }}
+      className="mt-6 w-full max-w-sm space-y-2.5 border-t border-cyan/10 pt-4"
+    >
+      {[
+        { k: 'HEURISTICS', v: `${stats.cpu}%`, bar: stats.cpu, tone: 'cyan' as const },
+        { k: 'MEMORY SHARDS', v: `${stats.memory}%`, bar: stats.memory, tone: 'cyan' as const },
+        { k: 'UPLINK', v: `${stats.uplink}%`, bar: stats.uplink, tone: 'lime' as const },
+      ].map((row) => (
+        <div key={row.k} className="space-y-1">
+          <div className="flex items-baseline justify-between">
+            <span className="hud-label">{row.k}</span>
+            <span className="font-mono text-[0.62rem] tabular-nums text-ice/75">{row.v}</span>
+          </div>
+          <SegmentBar value={row.bar} segments={20} tone={row.tone} />
+        </div>
+      ))}
+
+      <div className="flex items-center justify-between pt-1.5 font-mono text-[0.55rem] tracking-[0.16em] text-cyan/40">
+        <span>CORE TEMP {stats.coreTemp}°C</span>
+        <span>PING {stats.ping} MS</span>
+        <span className="jv-blink">● LIVE</span>
+      </div>
+    </motion.div>
   )
 }

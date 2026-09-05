@@ -397,6 +397,17 @@ body {
 [data-motion='calm'] .edge-shimmer,
 [data-motion='calm'] .holo-sheen { display: none; }
 
+/* Lite graphics budget: stop the purely decorative CSS loops as well, so the
+   compositor has nothing to redraw while the operator is just reading. */
+[data-quality='lite'] .crt-overlay,
+[data-quality='lite'] .edge-shimmer { display: none; }
+
+[data-quality='lite'] .jv-blink,
+[data-quality='lite'] .jv-flicker,
+[data-quality='lite'] .jv-drift {
+  animation: none !important;
+}
+
 [data-motion='calm'] .jv-blink,
 [data-motion='calm'] .jv-flicker,
 [data-motion='calm'] .jv-drift,

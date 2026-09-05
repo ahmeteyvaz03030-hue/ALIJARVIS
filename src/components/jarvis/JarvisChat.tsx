@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSystem } from '../../state/SystemProvider'
+import { useStats, useSystem } from '../../state/SystemProvider'
 import { useCountdown, useTypewriter } from '../../lib/hooks'
 import { EASE } from '../../lib/motion'
 import { TRIP } from '../../lib/config'
@@ -73,7 +73,8 @@ function JarvisAnswer({
 }
 
 export function JarvisChat() {
-  const { stats, phase, calm, cue, pushLog, pulseCore, setJarvisSpeaking } = useSystem()
+  const { phase, calm, cue, pushLog, pulseCore, setJarvisSpeaking } = useSystem()
+  const stats = useStats()
   const countdown = useCountdown(TRIP.departure)
   const [turns, setTurns] = useState<Turn[]>([
     {

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
-import { useSystem } from '../../state/SystemProvider'
+import { useStats, useSystem } from '../../state/SystemProvider'
 import { PHASE_LABEL, TRIP } from '../../lib/config'
 import type { JarvisSession } from '../../lib/auth'
 import { IconMotion, IconPower, IconSound } from './Icons'
@@ -20,9 +20,26 @@ function useClock() {
   return now
 }
 
+/** Isolated so the per-second tick repaints two lines of text instead of the
+ *  entire top bar (ticker, toggles and all). */
+function Clock() {
+  const now = useClock()
+  return (
+    <div className="text-right leading-none">
+      <div className="font-display text-[0.82rem] font-bold tabular-nums tracking-[0.1em] text-ice">
+        {now.toTimeString().slice(0, 8)}
+      </div>
+      <div className="mt-0.5 font-mono text-[0.5rem] tracking-[0.16em] text-cyan/40">
+        {now.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' }).toUpperCase()}
+      </div>
+    </div>
+  )
+}
+
 /** Scrolling telemetry strip — pure transform, so it is nearly free. */
 function Ticker() {
-  const { stats, phase, calm } = useSystem()
+  const { phase, calm, fx } = useSystem()
+  const stats = useStats()
   const items = useMemo(
     () => [
       `FLIGHT ${TRIP.flightNumber}`,
@@ -39,7 +56,7 @@ function Ticker() {
   )
   const strip = items.join('   ///   ')
 
-  if (calm) {
+  if (calm || !fx.ticker) {
     return (
       <div className="truncate font-mono text-[0.58rem] tracking-[0.18em] text-cyan/45">
         {strip}
@@ -76,8 +93,7 @@ export function TopBar({
   session: JarvisSession
   onSignOut: () => void
 }) {
-  const { settings, patchSettings, phase, calm, cue } = useSystem()
-  const now = useClock()
+  const { settings, patchSettings, phase, calm, cue, fx } = useSystem()
 
   const toggle = (patch: Parameters<typeof patchSettings>[0], sound = true) => {
     patchSettings(patch)
@@ -96,7 +112,7 @@ export function TopBar({
         <div className="flex shrink-0 items-center gap-2.5">
           <motion.span
             className="relative block h-6 w-6"
-            animate={calm ? undefined : { rotate: 360 }}
+            animate={fx.microPulses ? { rotate: 360 } : undefined}
             transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
           >
             <span className="absolute inset-0 rounded-full border border-cyan/40" />
@@ -126,14 +142,7 @@ export function TopBar({
             </StatusPill>
           </div>
 
-          <div className="text-right leading-none">
-            <div className="font-display text-[0.82rem] font-bold tabular-nums tracking-[0.1em] text-ice">
-              {now.toTimeString().slice(0, 8)}
-            </div>
-            <div className="mt-0.5 font-mono text-[0.5rem] tracking-[0.16em] text-cyan/40">
-              {now.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' }).toUpperCase()}
-            </div>
-          </div>
+          <Clock />
 
           <div className="flex items-center gap-1 border-l border-cyan/12 pl-2 sm:pl-3">
             <IconToggle
@@ -166,7 +175,7 @@ export function TopBar({
             </div>
             <span className="relative flex h-7 w-7 items-center justify-center border border-lime/40 bg-lime/10 font-display text-[0.6rem] font-black text-lime">
               {session.displayName.slice(0, 2)}
-              {!calm && (
+              {fx.microPulses && (
                 <motion.span
                   className="absolute inset-0 border border-lime/60"
                   animate={{ opacity: [0.8, 0, 0.8], scale: [1, 1.3, 1] }}

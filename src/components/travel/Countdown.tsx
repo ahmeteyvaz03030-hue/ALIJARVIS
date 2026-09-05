@@ -23,15 +23,22 @@ function Digit({ value, size }: { value: string; size: 'md' | 'lg' | 'xl' }) {
   }
 
   return (
-    <span className={`relative inline-block overflow-hidden text-center align-top ${cls}`}>
-      <AnimatePresence initial={false} mode="popLayout">
+    <span className={`relative grid overflow-hidden text-center align-top ${cls}`}>
+      {/* Plain AnimatePresence, not popLayout: popLayout absolutely-positions
+          the outgoing digit and re-measures its siblings, which meant a forced
+          layout pass every single second. The digits sit in a fixed-width box
+          anyway, so nothing needs measuring. */}
+      <AnimatePresence initial={false}>
         <motion.span
           key={value}
-          initial={{ y: '-100%', opacity: 0, filter: 'blur(6px)' }}
-          animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
-          exit={{ y: '100%', opacity: 0, filter: 'blur(6px)' }}
+          // No blur filter here: the seconds digit rolls once a second, and a
+          // filter animation repaints instead of compositing.
+          initial={{ y: '-100%', opacity: 0 }}
+          animate={{ y: '0%', opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
           transition={{ duration: 0.38, ease: EASE.out }}
           className="block font-display font-black tabular-nums"
+          style={{ gridArea: '1 / 1' }}
         >
           {value}
         </motion.span>
@@ -65,13 +72,13 @@ function Group({
 }
 
 const Sep = ({ size }: { size: 'md' | 'lg' | 'xl' }) => {
-  const { calm } = useSystem()
+  const { fx } = useSystem()
   return (
     <motion.span
       className={`self-start font-display font-black text-cyan/40 ${
         size === 'xl' ? 'text-4xl sm:text-6xl' : size === 'lg' ? 'text-3xl sm:text-4xl' : 'text-xl sm:text-2xl'
       }`}
-      animate={calm ? undefined : { opacity: [1, 0.2, 1] }}
+      animate={fx.microPulses ? { opacity: [1, 0.2, 1] } : undefined}
       transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
     >
       :

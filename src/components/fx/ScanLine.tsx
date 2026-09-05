@@ -45,8 +45,8 @@ export function ScanLine({
   opacity = 0.7,
   className = '',
 }: ScanLineProps) {
-  const { calm } = useSystem()
-  if (calm) return null
+  const { calm, fx } = useSystem()
+  if (calm || !fx.scanPasses) return null
 
   const vertical = orientation === 'vertical'
   const total = duration + restDelay

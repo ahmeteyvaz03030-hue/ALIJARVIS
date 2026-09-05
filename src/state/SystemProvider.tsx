@@ -19,11 +19,42 @@ import { resolvePhase, type FlightPhase } from '../lib/config'
 export type MotionPreference = 'auto' | 'full' | 'calm'
 export type MotionLevel = 'full' | 'calm'
 export type PerfTier = 'high' | 'low'
+export type Quality = 'auto' | 'high' | 'balanced' | 'lite'
+
+/**
+ * Which ambient effects are allowed to run continuously.
+ *
+ * Nothing here is about correctness — it's about how much of the screen is
+ * being repainted every frame. Each always-on effect covers a large,
+ * semi-transparent area, and a weaker GPU spends its whole frame budget
+ * compositing them, which is what "the page feels laggy" actually means.
+ */
+export interface EffectBudget {
+  /** Background particle field: full density, thinned out, or off. */
+  particles: 'full' | 'reduced' | 'off'
+  /** The hairline that sweeps the top edge of every HUD card. */
+  cardShimmer: boolean
+  /** Slow scan passes over panels. */
+  scanPasses: boolean
+  /** Rotating rings and rail dots in the RonalJarvis core.
+   *  'static' keeps the artwork but stops it turning. */
+  coreDetail: 'full' | 'reduced' | 'static'
+  /** Rotating radar beam. */
+  radarSweep: boolean
+  /** Scrolling telemetry marquee in the top bar. */
+  ticker: boolean
+  /** Small decorative loops: blinking cursors, status dots, the spinning
+   *  wordmark, badge pulses. Individually tiny, but a dozen of them keep the
+   *  compositor busy every single frame. */
+  microPulses: boolean
+}
 
 export interface Settings {
   motion: MotionPreference
   sound: boolean
   scanlines: boolean
+  /** How many ambient effects may run at once. */
+  quality: Quality
   /** Demo aid: force a mission phase to preview flight/arrival sequences. */
   phaseOverride: FlightPhase | null
   /** Operator's own TMDB key — see src/lib/tmdb.ts. Never shipped, never sent anywhere but themoviedb.org. */
@@ -57,11 +88,13 @@ interface SystemContextValue {
   motionLevel: MotionLevel
   /** Convenience: `true` when heavy motion must be suppressed. */
   calm: boolean
+  /** Resolved ambient-effect budget for this device and setting. */
+  fx: EffectBudget
+  /** What `quality: 'auto'` resolved to. */
+  resolvedQuality: Exclude<Quality, 'auto'>
   perfTier: PerfTier
   prefersReducedMotion: boolean
-  log: LogEntry[]
   pushLog: (text: string, level?: LogLevel) => void
-  stats: SystemStats
   /** 0 = idle breathing, 1 = fully lit. Read by the core without re-rendering. */
   coreIntensity: MotionValue<number>
   pulseCore: (strength?: number, holdMs?: number) => void
@@ -98,6 +131,7 @@ function defaultSettings(): Settings {
     // expensive to composite. It buys atmosphere, not function, so it starts
     // off on a device we've already flagged as tight on headroom.
     scanlines: detectPerfTier() === 'high',
+    quality: 'auto',
     phaseOverride: null,
     tmdbApiKey: null,
   }
@@ -136,6 +170,14 @@ const drift = (value: number, base: number, spread: number, lo: number, hi: numb
 }
 
 const SystemContext = createContext<SystemContextValue | null>(null)
+
+/* `stats` ticks every 1.8 s and `log` grows every few seconds. Keeping them in
+ * the main context meant every consumer — every HUD card, the nav rail, the
+ * core — re-rendered on that tick, whether or not it showed a number. They now
+ * live in their own contexts so only the handful of components that actually
+ * display them pay for the update. */
+const StatsContext = createContext<SystemStats | null>(null)
+const LogContext = createContext<LogEntry[] | null>(null)
 
 export function SystemProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(loadSettings)
@@ -178,6 +220,66 @@ export function SystemProvider({ children }: { children: ReactNode }) {
           : 'full'
   const calm = motionLevel === 'calm'
 
+  /* 'auto' leans conservative: a device we already scored as low-tier gets the
+   * lite budget, everything else gets balanced. Full detail is opt-in, because
+   * an operator noticing "it looks amazing" is worth less than one noticing
+   * "it feels smooth". */
+  const resolvedQuality: Exclude<Quality, 'auto'> =
+    settings.quality === 'auto'
+      ? perfTier === 'low'
+        ? 'lite'
+        : 'balanced'
+      : settings.quality
+
+  const fx = useMemo<EffectBudget>(() => {
+    if (calm) {
+      return {
+        particles: 'off',
+        cardShimmer: false,
+        scanPasses: false,
+        coreDetail: 'static',
+        radarSweep: false,
+        ticker: false,
+        microPulses: false,
+      }
+    }
+    switch (resolvedQuality) {
+      case 'high':
+        return {
+          particles: 'full',
+          cardShimmer: true,
+          scanPasses: true,
+          coreDetail: 'full',
+          radarSweep: true,
+          ticker: true,
+          microPulses: true,
+        }
+      case 'balanced':
+        return {
+          particles: 'reduced',
+          // The per-card shimmer is the single biggest source of always-on
+          // animation: one per HUD card, so a dashboard runs eight at once.
+          cardShimmer: false,
+          scanPasses: true,
+          coreDetail: 'full',
+          radarSweep: true,
+          ticker: true,
+          microPulses: true,
+        }
+      case 'lite':
+      default:
+        return {
+          particles: 'off',
+          cardShimmer: false,
+          scanPasses: false,
+          coreDetail: 'static',
+          radarSweep: false,
+          ticker: false,
+          microPulses: false,
+        }
+    }
+  }, [calm, resolvedQuality])
+
   /* --- persist + reflect settings onto the document ---------------------- */
   useEffect(() => {
     try {
@@ -193,7 +295,8 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     root.dataset.motion = motionLevel === 'calm' ? 'calm' : 'full'
     root.dataset.perf = perfTier
     root.dataset.scanlines = settings.scanlines && !calm ? 'on' : 'off'
-  }, [motionLevel, perfTier, settings.scanlines, calm])
+    root.dataset.quality = resolvedQuality
+  }, [motionLevel, perfTier, settings.scanlines, calm, resolvedQuality])
 
   const patchSettings = useCallback((patch: Partial<Settings>) => {
     setSettings((prev) => ({ ...prev, ...patch }))
@@ -284,11 +387,11 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       patchSettings,
       motionLevel,
       calm,
+      fx,
+      resolvedQuality,
       perfTier,
       prefersReducedMotion,
-      log,
       pushLog,
-      stats,
       coreIntensity,
       pulseCore,
       jarvisSpeaking,
@@ -301,11 +404,11 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       patchSettings,
       motionLevel,
       calm,
+      fx,
+      resolvedQuality,
       perfTier,
       prefersReducedMotion,
-      log,
       pushLog,
-      stats,
       coreIntensity,
       pulseCore,
       jarvisSpeaking,
@@ -314,7 +417,28 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     ],
   )
 
-  return <SystemContext.Provider value={value}>{children}</SystemContext.Provider>
+  return (
+    <SystemContext.Provider value={value}>
+      <StatsContext.Provider value={stats}>
+        <LogContext.Provider value={log}>{children}</LogContext.Provider>
+      </StatsContext.Provider>
+    </SystemContext.Provider>
+  )
+}
+
+/** Live telemetry. Subscribing re-renders on every 1.8 s tick — only use it
+ *  in the smallest component that actually prints a number. */
+export function useStats(): SystemStats {
+  const ctx = useContext(StatsContext)
+  if (!ctx) throw new Error('useStats must be used inside <SystemProvider>')
+  return ctx
+}
+
+/** The rolling system journal. */
+export function useLog(): LogEntry[] {
+  const ctx = useContext(LogContext)
+  if (!ctx) throw new Error('useLog must be used inside <SystemProvider>')
+  return ctx
 }
 
 export function useSystem(): SystemContextValue {

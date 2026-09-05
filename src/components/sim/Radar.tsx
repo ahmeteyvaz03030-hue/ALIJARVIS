@@ -34,7 +34,8 @@ export function Radar({
   size?: number
   label?: string
 }) {
-  const { calm } = useSystem()
+  const { calm, fx } = useSystem()
+  const sweep = fx.radarSweep && !calm
   const rings = [0.28, 0.55, 0.82, 1]
 
   const placed = useMemo(
@@ -104,14 +105,18 @@ export function Radar({
       </svg>
 
       {/* rotating beam */}
-      {!calm && (
+      {sweep && (
         <motion.div
           className="pointer-events-none absolute inset-0 rounded-full"
           style={{
             background:
               'conic-gradient(from 0deg, rgba(53,230,255,0.42), rgba(53,230,255,0.10) 22%, transparent 42%, transparent 100%)',
             clipPath: 'circle(46% at 50% 50%)',
+            // Promoted to its own layer: the conic gradient is rasterised once
+            // and the GPU just rotates that texture, instead of the browser
+            // re-painting a full-size gradient every frame.
             willChange: 'transform',
+            backfaceVisibility: 'hidden',
           }}
           animate={{ rotate: 360 }}
           transition={{ duration: period, repeat: Infinity, ease: 'linear' }}
@@ -119,13 +124,14 @@ export function Radar({
       )}
 
       {/* leading edge line */}
-      {!calm && (
+      {sweep && (
         <motion.div
           className="pointer-events-none absolute left-1/2 top-1/2 h-[46%] w-px origin-bottom"
           style={{
             background: 'linear-gradient(to top, rgba(53,230,255,0.9), transparent)',
             transform: 'translateX(-50%) translateY(-100%)',
             willChange: 'transform',
+            backfaceVisibility: 'hidden',
           }}
           animate={{ rotate: 360 }}
           transition={{ duration: period, repeat: Infinity, ease: 'linear' }}
@@ -157,7 +163,13 @@ export function Radar({
             )}
             <motion.span
               className="relative block h-1.5 w-1.5 rounded-full"
-              style={{ background: `rgb(${rgb})`, boxShadow: `0 0 8px rgba(${rgb},0.9)` }}
+              style={{
+                background: `rgb(${rgb})`,
+                // A ring-shaped gradient instead of box-shadow: same halo, but
+                // it never forces a repaint while the opacity pulses.
+                outline: `3px solid rgba(${rgb},0.18)`,
+                outlineOffset: '0px',
+              }}
               animate={calm ? undefined : { opacity: [1, 0.45, 1] }}
               transition={{
                 duration: period,

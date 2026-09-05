@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useSystem, type LogLevel } from '../../state/SystemProvider'
+import { useLog, useSystem, type LogLevel } from '../../state/SystemProvider'
 import { clockStamp } from '../../lib/hooks'
 import { EASE } from '../../lib/motion'
 import { HoloCard } from '../hud/HoloCard'
@@ -29,7 +29,8 @@ export function SystemLog({
   index?: number
   visibleCount?: number
 }) {
-  const { log, calm } = useSystem()
+  const { calm } = useSystem()
+  const log = useLog()
   const entries = log.slice(-visibleCount)
 
   return (

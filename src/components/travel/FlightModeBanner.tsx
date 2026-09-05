@@ -113,7 +113,7 @@ export function FlightModeCinematic({ onDone }: { onDone: () => void }) {
 
 /** Persistent strip while flight mode is on. */
 export function FlightModeStrip({ inFlight }: { inFlight: boolean }) {
-  const { calm } = useSystem()
+  const { fx } = useSystem()
   return (
     <motion.div
       initial={{ opacity: 0, y: -14 }}
@@ -122,7 +122,7 @@ export function FlightModeStrip({ inFlight }: { inFlight: boolean }) {
       transition={{ duration: 0.5, ease: EASE.out }}
       className="relative overflow-hidden border-b border-amber/30 bg-amber/[0.06]"
     >
-      {!calm && (
+      {fx.microPulses && (
         <motion.div
           className="absolute inset-y-0 w-1/3"
           style={{
@@ -136,13 +136,13 @@ export function FlightModeStrip({ inFlight }: { inFlight: boolean }) {
       <div className="relative flex items-center justify-center gap-3 px-4 py-1.5 font-display text-[0.58rem] font-black tracking-[0.26em] text-amber">
         <motion.span
           className="h-1.5 w-1.5 rotate-45 bg-amber"
-          animate={calm ? undefined : { opacity: [1, 0.2, 1] }}
+          animate={fx.microPulses ? { opacity: [1, 0.2, 1] } : undefined}
           transition={{ duration: 1.4, repeat: Infinity }}
         />
         {inFlight ? 'IN FLIGHT — RJ-2317 EN ROUTE TO DALAMAN' : 'FLIGHT MODE ACTIVE — DEPARTURE TODAY'}
         <motion.span
           className="h-1.5 w-1.5 rotate-45 bg-amber"
-          animate={calm ? undefined : { opacity: [1, 0.2, 1] }}
+          animate={fx.microPulses ? { opacity: [1, 0.2, 1] } : undefined}
           transition={{ duration: 1.4, repeat: Infinity, delay: 0.7 }}
         />
       </div>

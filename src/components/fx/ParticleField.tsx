@@ -21,7 +21,7 @@ interface Particle {
  */
 export function ParticleField() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const { calm, perfTier } = useSystem()
+  const { calm, perfTier, fx } = useSystem()
   const pageVisible = usePageVisible()
 
   useEffect(() => {
@@ -30,9 +30,15 @@ export function ParticleField() {
     const ctx = canvas.getContext('2d', { alpha: true })
     if (!ctx) return
 
-    const dpr = Math.min(window.devicePixelRatio || 1, perfTier === 'low' ? 1 : 1.5)
-    const count = calm ? 34 : perfTier === 'low' ? 30 : 64
-    const linkDist = perfTier === 'low' ? 108 : 138
+    // The field is a soft background texture, so it does not need device
+    // resolution. Rendering at ~0.75x and letting CSS scale it up cuts the
+    // per-frame fill cost to roughly half with no visible difference on a
+    // blurred, low-contrast layer like this one.
+    const dpr = fx.particles === 'reduced' ? 0.6 : 0.75
+    const count = calm ? 34 : fx.particles === 'reduced' ? 24 : 46
+    const linkDist = perfTier === 'low' ? 104 : 128
+    // Links are the O(n²) part; at 30 fps they still read as continuous.
+    const frameInterval = 1000 / 30
     let width = 0
     let height = 0
     let particles: Particle[] = []
@@ -114,15 +120,20 @@ export function ParticleField() {
       pointer.ty = e.clientY
     }
 
-    if (calm || !pageVisible) {
+    // 'off' still paints one static frame — an empty background reads as a
+    // bug, a still starfield reads as deliberate.
+    if (calm || !pageVisible || fx.particles === 'off') {
       draw(false)
     } else {
       window.addEventListener('pointermove', onPointer, { passive: true })
-      const loop = () => {
+      let lastFrame = 0
+      const loop = (now: number) => {
+        raf = requestAnimationFrame(loop)
+        if (now - lastFrame < frameInterval) return
+        lastFrame = now
         pointer.x += (pointer.tx - pointer.x) * 0.08
         pointer.y += (pointer.ty - pointer.y) * 0.08
         draw(true)
-        raf = requestAnimationFrame(loop)
       }
       raf = requestAnimationFrame(loop)
     }
@@ -132,7 +143,7 @@ export function ParticleField() {
       window.removeEventListener('resize', resize)
       window.removeEventListener('pointermove', onPointer)
     }
-  }, [calm, perfTier, pageVisible])
+  }, [calm, perfTier, pageVisible, fx.particles])
 
   return (
     <canvas

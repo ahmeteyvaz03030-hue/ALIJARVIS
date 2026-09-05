@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useEffect } from 'react'
-import { useSystem } from '../state/SystemProvider'
+import { useStats, useSystem } from '../state/SystemProvider'
 import { EASE } from '../lib/motion'
 import { HoloCard } from '../components/hud/HoloCard'
 import { SegmentBar, StatusPill } from '../components/hud/Readout'
@@ -8,7 +8,8 @@ import { TonyComms } from '../components/comms/TonyComms'
 import type { useComms } from '../state/useComms'
 
 export function CommsView({ comms }: { comms: ReturnType<typeof useComms> }) {
-  const { stats, calm } = useSystem()
+  const { calm } = useSystem()
+  const stats = useStats()
 
   useEffect(() => {
     comms.setViewing(true)

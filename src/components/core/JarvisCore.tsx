@@ -1,51 +1,92 @@
 import { motion, useTransform } from 'framer-motion'
 import { useMemo } from 'react'
-import { useSystem } from '../../state/SystemProvider'
+import { useStats, useSystem } from '../../state/SystemProvider'
 import { seeded } from '../../lib/motion'
+
+/* -------------------------------------------------------------------------- *
+ * Performance note — this component used to cost ~33 FPS on its own.
+ *
+ * The old version was one big SVG whose <g> elements rotated. An SVG transform
+ * is not compositable: every frame the browser had to re-rasterise the whole
+ * drawing, and several children carried `filter: drop-shadow(...)`, so it also
+ * recomputed a blur per element per frame.
+ *
+ * The rebuild keeps the look but changes the mechanics:
+ *   · every continuously moving part is its own absolutely-positioned <div>
+ *     layer holding a small static SVG. Only the *layer* rotates, so the GPU
+ *     just re-uses an already-rasterised texture.
+ *   · `drop-shadow` is gone. Glow is faked with a larger, low-opacity circle
+ *     behind each dot — visually near-identical, essentially free.
+ *   · the 48 individually-animated voiceprint lines became one static group
+ *     whose wrapper scales, i.e. 1 animated value instead of 96.
+ * -------------------------------------------------------------------------- */
 
 interface JarvisCoreProps {
   size?: number
-  /** Small caption under the core. */
   caption?: string
   className?: string
 }
 
-/**
- * The RonalJarvis core: five independently rotating ring systems, dots running
- * the rails, a radar sweep, radiating data spokes and a breathing centre.
- *
- * Excitation comes from `coreIntensity` (a MotionValue), so the whole thing
- * reacts to RonalJarvis speaking or processing without a single React re-render.
- */
+/** A layer that spins forever. Promoted to its own compositor layer so the
+ *  rotation never repaints what's inside it. */
+function SpinLayer({
+  duration,
+  reverse = false,
+  spin,
+  children,
+}: {
+  duration: number
+  reverse?: boolean
+  spin: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <motion.div
+      className="absolute inset-0"
+      style={{ willChange: spin ? 'transform' : undefined }}
+      animate={spin ? { rotate: reverse ? -360 : 360 } : undefined}
+      transition={{ duration, repeat: Infinity, ease: 'linear' }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+/** Cheap glow: a soft fill circle instead of a blur filter. */
+function GlowDot({ cx, cy, r, color }: { cx: number; cy: number; r: number; color: string }) {
+  return (
+    <>
+      <circle cx={cx} cy={cy} r={r * 3.2} fill={color} opacity="0.16" />
+      <circle cx={cx} cy={cy} r={r * 1.9} fill={color} opacity="0.28" />
+      <circle cx={cx} cy={cy} r={r} fill={color} />
+    </>
+  )
+}
+
+const VB = '-160 -160 320 320'
+
 export function JarvisCore({ size = 320, caption, className = '' }: JarvisCoreProps) {
-  const { calm, perfTier, coreIntensity, jarvisSpeaking, stats } = useSystem()
+  const { calm, perfTier, coreIntensity, jarvisSpeaking, fx } = useSystem()
 
   const glowOpacity = useTransform(coreIntensity, [0, 1], [0.34, 1])
   const coreScale = useTransform(coreIntensity, [0, 1], [1, 1.09])
   const haloScale = useTransform(coreIntensity, [0, 1], [1, 1.16])
-  const spokeOpacity = useTransform(coreIntensity, [0, 1], [0.4, 0.95])
 
-  const dense = perfTier === 'high' && !calm
-  const ticks = useMemo(() => Array.from({ length: dense ? 72 : 36 }, (_, i) => i), [dense])
+  const full = fx.coreDetail === 'full'
+  const spin = !calm && fx.coreDetail !== 'static'
+  const dense = perfTier === 'high' && !calm && full
+  const speedUp = jarvisSpeaking ? 0.45 : 1
+
+  const ticks = useMemo(() => Array.from({ length: dense ? 48 : 24 }, (_, i) => i), [dense])
   const spokes = useMemo(() => [12, 58, 104, 168, 212, 268, 314], [])
   const voice = useMemo(() => {
     const rand = seeded(4711)
-    return Array.from({ length: dense ? 48 : 28 }, () => 0.2 + rand() * 0.8)
+    return Array.from({ length: dense ? 36 : 20 }, () => 0.2 + rand() * 0.8)
   }, [dense])
-
-  const spin = (dur: number, reverse = false) =>
-    calm
-      ? undefined
-      : {
-          rotate: reverse ? -360 : 360,
-          transition: { duration: dur, repeat: Infinity, ease: 'linear' as const },
-        }
-
-  const speedUp = jarvisSpeaking ? 0.45 : 1
 
   return (
     <div className={`relative select-none ${className}`} style={{ width: size, height: size }}>
-      {/* outer halo */}
+      {/* halo — opacity/scale only, both compositable */}
       <motion.div
         className="pointer-events-none absolute inset-0 rounded-full"
         style={{
@@ -55,53 +96,69 @@ export function JarvisCore({ size = 320, caption, className = '' }: JarvisCorePr
           scale: haloScale,
         }}
       />
-      {/* idle breathing bloom */}
-      {!calm && (
+      {spin && (
         <motion.div
           className="pointer-events-none absolute inset-[18%] rounded-full"
           style={{
             background:
               'radial-gradient(circle, rgba(182,244,255,0.20), rgba(53,230,255,0.06) 55%, transparent 72%)',
+            willChange: 'transform, opacity',
           }}
           animate={{ opacity: [0.45, 0.9, 0.45], scale: [0.96, 1.05, 0.96] }}
-          transition={{
-            duration: 3.6 * speedUp,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
+          transition={{ duration: 3.6 * speedUp, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
 
-      <svg viewBox="-160 -160 320 320" className="absolute inset-0 h-full w-full overflow-visible">
+      {/* ---- static base plate: everything that never moves, drawn once ---- */}
+      <svg viewBox={VB} className="absolute inset-0 h-full w-full">
         <defs>
-          <radialGradient id="core-fan">
-            <stop offset="30%" stopColor="#35e6ff" stopOpacity="0" />
-            <stop offset="100%" stopColor="#35e6ff" stopOpacity="0.22" />
-          </radialGradient>
-          <linearGradient id="core-spoke" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#35e6ff" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#35e6ff" stopOpacity="0" />
-          </linearGradient>
           <radialGradient id="core-centre">
             <stop offset="0%" stopColor="#eafcff" stopOpacity="0.95" />
             <stop offset="45%" stopColor="#35e6ff" stopOpacity="0.55" />
             <stop offset="100%" stopColor="#35e6ff" stopOpacity="0" />
           </radialGradient>
+          <linearGradient id="core-spoke" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#35e6ff" stopOpacity="0.7" />
+            <stop offset="100%" stopColor="#35e6ff" stopOpacity="0" />
+          </linearGradient>
         </defs>
 
-        {/* radar sweep */}
-        {!calm && (
-          <motion.g animate={spin(7.5 * speedUp)} style={{ transformOrigin: '0px 0px' }}>
-            <path d="M 0 0 L 0 -150 A 150 150 0 0 1 92 -118 Z" fill="url(#core-fan)" />
-            <line x1="0" y1="0" x2="0" y2="-150" stroke="#35e6ff" strokeOpacity="0.55" strokeWidth="1" />
-          </motion.g>
-        )}
+        <circle r="150" fill="none" stroke="#35e6ff" strokeOpacity="0.13" />
+        <circle r="128" fill="none" stroke="#35e6ff" strokeOpacity="0.1" />
+        <circle r="88" fill="none" stroke="#35e6ff" strokeOpacity="0.2" />
+        <circle r="60" fill="url(#core-centre)" opacity="0.55" />
 
-        {/* ring 1 — tick collar */}
-        <motion.g animate={spin(64)} style={{ transformOrigin: '0px 0px' }}>
-          <circle r="150" fill="none" stroke="#35e6ff" strokeOpacity="0.13" />
+        {/* radiating spokes */}
+        {spokes.map((deg) => (
+          <g key={deg} transform={`rotate(${deg})`}>
+            <line x1="152" y1="0" x2="176" y2="0" stroke="url(#core-spoke)" strokeWidth="1.2" />
+            <circle cx="178" cy="0" r="1.6" fill="#35e6ff" fillOpacity="0.8" />
+          </g>
+        ))}
+
+        {/* voiceprint collar — static geometry, the wrapper animates instead */}
+        <g>
+          {voice.map((h, i) => (
+            <line
+              key={i}
+              x1="0"
+              y1="-96"
+              x2="0"
+              y2={-96 - h * 12}
+              stroke="#35e6ff"
+              strokeWidth="1.6"
+              strokeOpacity="0.45"
+              transform={`rotate(${(i / voice.length) * 360})`}
+            />
+          ))}
+        </g>
+      </svg>
+
+      {/* ---- moving layers: each one composited, none of them repaint ---- */}
+      <SpinLayer duration={64} spin={spin}>
+        <svg viewBox={VB} className="h-full w-full">
           {ticks.map((i) => {
-            const long = i % (dense ? 6 : 3) === 0
+            const long = i % 6 === 0
             return (
               <line
                 key={i}
@@ -116,153 +173,121 @@ export function JarvisCore({ size = 320, caption, className = '' }: JarvisCorePr
               />
             )
           })}
-        </motion.g>
+        </svg>
+      </SpinLayer>
 
-        {/* ring 2 — dashed, reverse */}
-        <motion.circle
-          r="128"
-          fill="none"
-          stroke="#35e6ff"
-          strokeOpacity="0.34"
-          strokeWidth="1"
-          strokeDasharray="2 10"
-          animate={spin(34 * speedUp, true)}
-          style={{ transformOrigin: '0px 0px' }}
-        />
+      <SpinLayer duration={34 * speedUp} reverse spin={spin}>
+        <svg viewBox={VB} className="h-full w-full">
+          <circle r="128" fill="none" stroke="#35e6ff" strokeOpacity="0.34" strokeWidth="1" strokeDasharray="2 10" />
+        </svg>
+      </SpinLayer>
 
-        {/* ring 3 — heavy broken arcs */}
-        <motion.g animate={spin(19 * speedUp)} style={{ transformOrigin: '0px 0px' }}>
+      <SpinLayer duration={19 * speedUp} spin={spin}>
+        <svg viewBox={VB} className="h-full w-full">
           <path d="M 0 -110 A 110 110 0 0 1 95 -55" fill="none" stroke="#35e6ff" strokeOpacity="0.75" strokeWidth="2.4" strokeLinecap="round" />
           <path d="M 0 110 A 110 110 0 0 1 -95 55" fill="none" stroke="#35e6ff" strokeOpacity="0.4" strokeWidth="2.4" strokeLinecap="round" />
           <path d="M -95 -55 A 110 110 0 0 1 -55 -95" fill="none" stroke="#b6f4ff" strokeOpacity="0.85" strokeWidth="2.4" strokeLinecap="round" />
-        </motion.g>
+        </svg>
+      </SpinLayer>
 
-        {/* ring 4 — thin counter ring with node dots */}
-        <motion.g animate={spin(12 * speedUp, true)} style={{ transformOrigin: '0px 0px' }}>
-          <circle r="88" fill="none" stroke="#35e6ff" strokeOpacity="0.2" />
+      <SpinLayer duration={12 * speedUp} reverse spin={spin}>
+        <svg viewBox={VB} className="h-full w-full">
           {[0, 90, 180, 270].map((deg) => (
-            <circle
-              key={deg}
-              cx={0}
-              cy={-88}
-              r="2.6"
-              fill="#b6f4ff"
-              transform={`rotate(${deg})`}
-              style={{ filter: 'drop-shadow(0 0 6px #35e6ff)' }}
-            />
-          ))}
-        </motion.g>
-
-        {/* dots running the rails at different speeds */}
-        {!calm &&
-          [
-            { r: 150, dur: 9, rev: false, size: 3 },
-            { r: 128, dur: 6.4, rev: true, size: 2.2 },
-            { r: 110, dur: 4.6, rev: false, size: 2.6 },
-            { r: 68, dur: 3.4, rev: true, size: 2 },
-          ].map((rail, i) => (
-            <motion.g
-              key={i}
-              animate={spin(rail.dur * speedUp, rail.rev)}
-              style={{ transformOrigin: '0px 0px' }}
-            >
-              <circle
-                cx="0"
-                cy={-rail.r}
-                r={rail.size}
-                fill="#eafcff"
-                style={{ filter: 'drop-shadow(0 0 7px #35e6ff)' }}
-              />
-              <path
-                d={`M 0 ${-rail.r} A ${rail.r} ${rail.r} 0 0 ${rail.rev ? 1 : 0} ${
-                  rail.rev ? -rail.r * 0.34 : rail.r * 0.34
-                } ${-rail.r * 0.94}`}
-                fill="none"
-                stroke="#35e6ff"
-                strokeOpacity="0.45"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </motion.g>
-          ))}
-
-        {/* radiating data spokes */}
-        <motion.g style={{ opacity: spokeOpacity }}>
-          {spokes.map((deg, i) => (
             <g key={deg} transform={`rotate(${deg})`}>
-              <line x1="0" y1={-152} x2="0" y2={-172} stroke="url(#core-spoke)" strokeWidth="1.2" transform="rotate(180)" />
-              <motion.line
-                x1="152"
-                y1="0"
-                x2="176"
-                y2="0"
-                stroke="#35e6ff"
-                strokeWidth="1.2"
-                strokeOpacity="0.6"
-                animate={calm ? undefined : { strokeOpacity: [0.15, 0.75, 0.15] }}
-                transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.3, ease: 'easeInOut' }}
-              />
-              <circle cx="178" cy="0" r="1.6" fill="#35e6ff" fillOpacity="0.8" />
+              <GlowDot cx={0} cy={-88} r={2.6} color="#b6f4ff" />
             </g>
           ))}
-        </motion.g>
+        </svg>
+      </SpinLayer>
 
-        {/* emanating pulses while speaking */}
-        {jarvisSpeaking &&
-          !calm &&
-          [0, 1, 2].map((i) => (
-            <motion.circle
+      {/* radar sweep — one rotating layer, gradient rasterised once */}
+      {spin && full && (
+        <SpinLayer duration={7.5 * speedUp} spin={spin}>
+          <svg viewBox={VB} className="h-full w-full">
+            <defs>
+              <radialGradient id="core-fan">
+                <stop offset="30%" stopColor="#35e6ff" stopOpacity="0" />
+                <stop offset="100%" stopColor="#35e6ff" stopOpacity="0.22" />
+              </radialGradient>
+            </defs>
+            <path d="M 0 0 L 0 -150 A 150 150 0 0 1 92 -118 Z" fill="url(#core-fan)" />
+            <line x1="0" y1="0" x2="0" y2="-150" stroke="#35e6ff" strokeOpacity="0.55" strokeWidth="1" />
+          </svg>
+        </SpinLayer>
+      )}
+
+      {/* dots running the rails */}
+      {spin && full &&
+        [
+          { r: 150, dur: 9, rev: false, s: 3 },
+          { r: 128, dur: 6.4, rev: true, s: 2.2 },
+          { r: 110, dur: 4.6, rev: false, s: 2.6 },
+          { r: 68, dur: 3.4, rev: true, s: 2 },
+        ].map((rail, i) => (
+          <SpinLayer key={i} duration={rail.dur * speedUp} reverse={rail.rev} spin={spin}>
+            <svg viewBox={VB} className="h-full w-full">
+              <GlowDot cx={0} cy={-rail.r} r={rail.s} color="#eafcff" />
+            </svg>
+          </SpinLayer>
+        ))}
+
+      {/* emanating pulses while speaking — transform/opacity only */}
+      {jarvisSpeaking && spin && (
+        <div className="pointer-events-none absolute inset-0">
+          {[0, 1, 2].map((i) => (
+            <motion.span
               key={i}
-              r="62"
-              fill="none"
-              stroke="#b6f4ff"
-              strokeWidth="1.4"
+              className="absolute left-1/2 top-1/2 rounded-full border border-ice/70"
+              style={{ width: '38%', height: '38%', x: '-50%', y: '-50%', willChange: 'transform, opacity' }}
               initial={{ scale: 0.6, opacity: 0.7 }}
               animate={{ scale: 2.5, opacity: 0 }}
               transition={{ duration: 2.2, repeat: Infinity, delay: i * 0.73, ease: 'easeOut' }}
-              style={{ transformOrigin: '0px 0px' }}
             />
           ))}
+        </div>
+      )}
 
-        {/* centre */}
-        <motion.g style={{ scale: coreScale, transformOrigin: '0px 0px' }}>
-          <circle r="60" fill="url(#core-centre)" opacity="0.55" />
-          <motion.circle
-            r="44"
-            fill="none"
-            stroke="#35e6ff"
-            strokeWidth="1"
-            strokeOpacity="0.55"
-            initial={{ r: 42, strokeOpacity: 0.35 }}
-            animate={calm ? { r: 44 } : { r: [42, 47, 42], strokeOpacity: [0.35, 0.8, 0.35] }}
+      {/* centre — one scaling layer holding two counter-rotating polygons */}
+      <motion.div className="absolute inset-0" style={{ scale: coreScale }}>
+        <SpinLayer duration={26} reverse spin={spin}>
+          <svg viewBox={VB} className="h-full w-full">
+            <polygon points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15" fill="none" stroke="#b6f4ff" strokeOpacity="0.75" strokeWidth="1.3" />
+          </svg>
+        </SpinLayer>
+        <SpinLayer duration={15} spin={spin}>
+          <svg viewBox={VB} className="h-full w-full">
+            <polygon points="0,-18 16,-9 16,9 0,18 -16,9 -16,-9" fill="rgba(53,230,255,0.14)" stroke="#eafcff" strokeOpacity="0.85" strokeWidth="1" />
+          </svg>
+        </SpinLayer>
+        {spin && (
+          <motion.div
+            className="absolute inset-0"
+            style={{ willChange: 'transform, opacity' }}
+            animate={{ scale: [0.97, 1.06, 0.97], opacity: [0.35, 0.8, 0.35] }}
             transition={{ duration: 2.8 * speedUp, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.g animate={spin(26, true)} style={{ transformOrigin: '0px 0px' }}>
-            <polygon
-              points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15"
-              fill="none"
-              stroke="#b6f4ff"
-              strokeOpacity="0.75"
-              strokeWidth="1.3"
-            />
-          </motion.g>
-          <motion.g animate={spin(15)} style={{ transformOrigin: '0px 0px' }}>
-            <polygon
-              points="0,-18 16,-9 16,9 0,18 -16,9 -16,-9"
-              fill="rgba(53,230,255,0.14)"
-              stroke="#eafcff"
-              strokeOpacity="0.85"
-              strokeWidth="1"
-            />
-          </motion.g>
-        </motion.g>
+          >
+            <svg viewBox={VB} className="h-full w-full">
+              <circle r="44" fill="none" stroke="#35e6ff" strokeWidth="1" />
+            </svg>
+          </motion.div>
+        )}
+      </motion.div>
 
-        {/* voiceprint collar */}
-        <g>
-          {voice.map((h, i) => {
-            const angle = (i / voice.length) * 360
-            return (
-              <motion.line
+      {/* voiceprint excitation: one wrapper scales, not 48 lines */}
+      {spin && (
+        <motion.div
+          className="pointer-events-none absolute inset-0"
+          style={{ willChange: 'transform, opacity' }}
+          animate={
+            jarvisSpeaking
+              ? { scale: [1, 1.04, 1.01, 1.05, 1], opacity: [0.5, 1, 0.7, 0.95, 0.5] }
+              : { scale: [1, 1.012, 1], opacity: [0.35, 0.6, 0.35] }
+          }
+          transition={{ duration: jarvisSpeaking ? 0.9 : 4.2, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <svg viewBox={VB} className="h-full w-full">
+            {voice.map((h, i) => (
+              <line
                 key={i}
                 x1="0"
                 y1="-96"
@@ -271,46 +296,40 @@ export function JarvisCore({ size = 320, caption, className = '' }: JarvisCorePr
                 stroke="#35e6ff"
                 strokeWidth="1.6"
                 strokeOpacity="0.5"
-                transform={`rotate(${angle})`}
-                animate={
-                  calm
-                    ? undefined
-                    : jarvisSpeaking
-                      ? { scaleY: [0.3, 1, 0.45, 0.9, 0.3], strokeOpacity: [0.3, 0.9, 0.45, 0.8, 0.3] }
-                      : { scaleY: [0.25, 0.5, 0.25], strokeOpacity: [0.2, 0.4, 0.2] }
-                }
-                transition={{
-                  duration: jarvisSpeaking ? 0.9 : 4.2,
-                  repeat: Infinity,
-                  delay: (i % 7) * 0.11,
-                  ease: 'easeInOut',
-                }}
-                style={{ transformOrigin: '0px -96px' }}
+                transform={`rotate(${(i / voice.length) * 360})`}
               />
-            )
-          })}
-        </g>
-      </svg>
-
-      {/* centre readout */}
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <motion.div
-          className="font-display text-[0.55rem] font-bold tracking-[0.3em] text-ice/80"
-          animate={calm ? undefined : { opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          {jarvisSpeaking ? 'SPEAKING' : 'CORE'}
+            ))}
+          </svg>
         </motion.div>
-        <div className="mt-0.5 font-mono text-[0.55rem] tabular-nums text-cyan/60">
-          {stats.coreTemp}°C · {stats.cpu}%
-        </div>
-      </div>
+      )}
+
+      <CoreReadout jarvisSpeaking={jarvisSpeaking} calm={calm} />
 
       {caption && (
         <div className="absolute inset-x-0 -bottom-1 text-center font-mono text-[0.55rem] tracking-[0.3em] text-cyan/45">
           {caption}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Split out so the 1.8 s telemetry tick re-renders these two lines of text
+ *  instead of the entire core. */
+function CoreReadout({ jarvisSpeaking, calm }: { jarvisSpeaking: boolean; calm: boolean }) {
+  const stats = useStats()
+  return (
+    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+      <motion.div
+        className="font-display text-[0.55rem] font-bold tracking-[0.3em] text-ice/80"
+        animate={calm ? undefined : { opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        {jarvisSpeaking ? 'SPEAKING' : 'CORE'}
+      </motion.div>
+      <div className="mt-0.5 font-mono text-[0.55rem] tabular-nums text-cyan/60">
+        {stats.coreTemp}°C · {stats.cpu}%
+      </div>
     </div>
   )
 }

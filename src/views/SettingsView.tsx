@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import { useSystem, type MotionPreference } from '../state/SystemProvider'
+import { useSystem, type MotionPreference, type Quality } from '../state/SystemProvider'
 import { FLIGHT_PHASES, PHASE_LABEL, type FlightPhase } from '../lib/config'
 import { authProvider, type JarvisSession } from '../lib/auth'
 import { EASE } from '../lib/motion'
@@ -206,7 +206,7 @@ export function SettingsView({
   onReplayFlightMode: () => void
   onReplayArrival: () => void
 }) {
-  const { settings, patchSettings, motionLevel, perfTier, prefersReducedMotion, phase, pushLog } =
+  const { settings, patchSettings, motionLevel, resolvedQuality, prefersReducedMotion, phase, pushLog } =
     useSystem()
 
   return (
@@ -239,6 +239,22 @@ export function SettingsView({
           />
         </Row>
 
+        <Row
+          label="GRAFIKQUALITÄT"
+          hint="Steuert, wie viele Effekte dauerhaft laufen. Wenn die Oberfläche ruckelt: SPARSAM. AUTO wählt nach erkannter Geräteleistung."
+        >
+          <Choice<Quality>
+            value={settings.quality}
+            onChange={(quality) => patchSettings({ quality })}
+            options={[
+              { value: 'auto', label: 'AUTO' },
+              { value: 'high', label: 'HOCH' },
+              { value: 'balanced', label: 'MITTEL' },
+              { value: 'lite', label: 'SPARSAM' },
+            ]}
+          />
+        </Row>
+
         <Row label="SCANLINES" hint="CRT-Overlay über der gesamten Oberfläche.">
           <Choice
             value={settings.scanlines ? 'on' : 'off'}
@@ -253,7 +269,7 @@ export function SettingsView({
         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-cyan/10 pt-4">
           {[
             ['MOTION LEVEL', motionLevel.toUpperCase()],
-            ['RENDER BUDGET', perfTier.toUpperCase()],
+            ['AKTIVE QUALITÄT', resolvedQuality.toUpperCase()],
             ['OS PREFERENCE', prefersReducedMotion ? 'REDUCED' : 'NORMAL'],
           ].map(([k, v]) => (
             <div key={k}>

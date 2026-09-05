@@ -66,13 +66,12 @@ export function SegmentBar({
         <motion.span
           key={i}
           className="h-2.5 flex-1"
+          // Colour is fixed and only opacity animates: animating
+          // backgroundColor/boxShadow here repainted the whole bar on every
+          // telemetry tick, opacity is handled by the compositor alone.
+          style={{ backgroundColor: `rgb(${rgb})` }}
           initial={false}
-          animate={{
-            backgroundColor:
-              i < filled ? `rgba(${rgb},${0.5 + (i / segments) * 0.5})` : `rgba(${rgb},0.09)`,
-            boxShadow:
-              i === filled - 1 ? `0 0 10px rgba(${rgb},0.9)` : '0 0 0 rgba(0,0,0,0)',
-          }}
+          animate={{ opacity: i < filled ? 0.5 + (i / segments) * 0.5 : 0.09 }}
           transition={{ duration: 0.28, delay: i * 0.006 }}
         />
       ))}
@@ -121,7 +120,7 @@ export function StatusPill({
   tone?: 'cyan' | 'lime' | 'amber' | 'danger'
   pulse?: boolean
 }) {
-  const { calm } = useSystem()
+  const { calm, fx } = useSystem()
   const rgb = TONE[tone]
   return (
     <span
@@ -135,7 +134,7 @@ export function StatusPill({
       <motion.span
         className="h-1 w-1 rounded-full"
         style={{ background: `rgb(${rgb})` }}
-        animate={pulse && !calm ? { opacity: [1, 0.25, 1], scale: [1, 0.8, 1] } : undefined}
+        animate={pulse && !calm && fx.microPulses ? { opacity: [1, 0.25, 1], scale: [1, 0.8, 1] } : undefined}
         transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
       />
       {children}

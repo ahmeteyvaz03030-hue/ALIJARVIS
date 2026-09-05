@@ -51,7 +51,7 @@ export function HoloCard({
   actions,
   onClick,
 }: HoloCardProps) {
-  const { calm, cue } = useSystem()
+  const { calm, cue, fx } = useSystem()
   const tilt = useHoloTilt(flat || calm ? 0 : 5, !flat && !calm)
   const rgb = TONE_RGB[tone]
 
@@ -92,7 +92,7 @@ export function HoloCard({
           }}
         />
         {/* animated top hairline */}
-        {!calm && <div className="edge-shimmer" />}
+        {fx.cardShimmer && <div className="edge-shimmer" />}
         {/* corner brackets */}
         <span
           aria-hidden="true"
@@ -105,7 +105,7 @@ export function HoloCard({
           style={{ background: `rgba(${rgb},0.8)` }}
         />
 
-        {scan && <ScanLine tone={tone === 'violet' || tone === 'danger' ? 'cyan' : tone} />}
+        {scan && fx.scanPasses && <ScanLine tone={tone === 'violet' || tone === 'danger' ? 'cyan' : tone} />}
 
         {(title || status || actions) && (
           <header

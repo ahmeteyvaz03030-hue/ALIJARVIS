@@ -121,7 +121,6 @@ export function ScannerRing({
           initial={{ strokeDashoffset: circ }}
           animate={{ strokeDashoffset: circ * (1 - Math.min(1, progress / 100)) }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          style={{ filter: `drop-shadow(0 0 6px ${color})` }}
         />
 
         {/* dashed counter-rotating ring */}
@@ -186,7 +185,6 @@ export function ScannerRing({
                 cy={-(62 + i * 22)}
                 r={i === 1 ? 3 : 2}
                 fill={color}
-                style={{ filter: `drop-shadow(0 0 5px ${color})` }}
               />
             </motion.g>
           ))}

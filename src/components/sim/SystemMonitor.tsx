@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useSystem } from '../../state/SystemProvider'
+import { useStats, useSystem } from '../../state/SystemProvider'
 import { HoloCard } from '../hud/HoloCard'
 import { AnimatedNumber, SegmentBar, StatusPill } from '../hud/Readout'
 
@@ -45,7 +45,8 @@ function Sparkline({ data, tone = '53,230,255' }: { data: number[]; tone?: strin
  * always feels alive. Values drift toward a baseline rather than jumping.
  */
 export function SystemMonitor({ index = 0 }: { index?: number }) {
-  const { stats, calm } = useSystem()
+  const { calm, fx } = useSystem()
+  const stats = useStats()
   const [cpuHistory, setCpuHistory] = useState<number[]>([])
   const [netHistory, setNetHistory] = useState<number[]>([])
   const last = useRef(0)
@@ -140,7 +141,7 @@ export function SystemMonitor({ index = 0 }: { index?: number }) {
         <span className="hud-label">System Status</span>
         <motion.span
           className="font-display text-[0.68rem] font-black tracking-[0.24em] text-lime text-glow-lime"
-          animate={calm ? undefined : { opacity: [0.75, 1, 0.75] }}
+          animate={fx.microPulses ? { opacity: [0.75, 1, 0.75] } : undefined}
           transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
         >
           {stats.cpu > 70 ? 'ELEVATED LOAD' : 'OPTIMAL'}

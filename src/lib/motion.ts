@@ -26,14 +26,15 @@ export const panelVariants: Variants = {
     opacity: 0,
     y: 26,
     scale: 0.965,
-    filter: 'brightness(1.8)',
     transition: { delay: i * 0.02 },
   }),
+  // No `filter` in here on purpose: framer-motion leaves the final value as an
+  // inline style, so every card would keep a `filter: brightness(1)` forever,
+  // and any element with a filter takes a slower paint path from then on.
   visible: (i: number = 0) => ({
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: 'brightness(1)',
     transition: {
       duration: 0.62,
       ease: EASE.out,
@@ -50,18 +51,18 @@ export const panelVariants: Variants = {
 
 /** View-level transition: old modules power down, new ones rail in. */
 export const viewVariants: Variants = {
-  hidden: { opacity: 0, x: 34, filter: 'blur(6px)' },
+  // Blurring the whole view during a switch meant a full-page filter pass on
+  // every frame of the transition — the single jankiest moment in the app.
+  hidden: { opacity: 0, x: 34 },
   visible: {
     opacity: 1,
     x: 0,
-    filter: 'blur(0px)',
-    transition: { duration: 0.46, ease: EASE.out },
+    transition: { duration: 0.4, ease: EASE.out },
   },
   exit: {
     opacity: 0,
     x: -26,
-    filter: 'blur(8px)',
-    transition: { duration: 0.28, ease: EASE.rail },
+    transition: { duration: 0.24, ease: EASE.rail },
   },
 }
 

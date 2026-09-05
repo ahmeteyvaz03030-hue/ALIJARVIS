@@ -49,7 +49,7 @@ export function NavRail({
   /** Per-view unread/open counts — shown as a small pulsing badge on the icon. */
   badges?: Partial<Record<ViewId, number>>
 }) {
-  const { calm, cue } = useSystem()
+  const { cue, fx } = useSystem()
 
   return (
     <>
@@ -78,7 +78,7 @@ export function NavRail({
           <div className="h-px bg-cyan/15" />
           <motion.div
             className="mt-3 flex flex-col items-center gap-1 font-mono text-[0.5rem] tracking-[0.2em] text-cyan/35"
-            animate={calm ? undefined : { opacity: [0.5, 1, 0.5] }}
+            animate={fx.microPulses ? { opacity: [0.5, 1, 0.5] } : undefined}
             transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
           >
             <span>RJV</span>
@@ -112,11 +112,11 @@ export function NavRail({
 }
 
 function Badge({ count }: { count: number }) {
-  const { calm } = useSystem()
+  const { fx } = useSystem()
   if (!count) return null
   return (
     <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center px-1">
-      {!calm && (
+      {fx.microPulses && (
         <motion.span
           className="absolute inset-0 rounded-full border border-amber"
           animate={{ scale: [1, 1.9], opacity: [0.9, 0] }}
