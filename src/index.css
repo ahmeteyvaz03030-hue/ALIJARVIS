@@ -109,7 +109,12 @@ body {
   position: relative;
   background: var(--panel-bg);
   border: 1px solid var(--hud-line);
-  backdrop-filter: blur(8px);
+  /* No backdrop-filter here on purpose: this class is applied to every HUD
+     card, and a dozen simultaneous blurred-backdrop regions is one of the
+     costliest things a browser can composite per frame, especially with
+     the particle canvas and scan sweeps moving underneath. The gradient
+     background above is already ~85-90% opaque, so the frosted look barely
+     changes without it. */
   box-shadow:
     inset 0 1px 0 rgb(182 244 255 / 0.06),
     inset 0 0 40px rgb(53 230 255 / 0.03),

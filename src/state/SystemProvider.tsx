@@ -75,23 +75,6 @@ interface SystemContextValue {
 
 const SETTINGS_KEY = 'ronaljarvis.settings.v1'
 
-const DEFAULT_SETTINGS: Settings = {
-  motion: 'auto',
-  sound: false,
-  scanlines: true,
-  phaseOverride: null,
-}
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
-    if (!raw) return DEFAULT_SETTINGS
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) }
-  } catch {
-    return DEFAULT_SETTINGS
-  }
-}
-
 /** Crude but effective device budget check, evaluated once. */
 function detectPerfTier(): PerfTier {
   if (typeof window === 'undefined') return 'high'
@@ -102,6 +85,30 @@ function detectPerfTier(): PerfTier {
   if (cores <= 4 || mem <= 3) return 'low'
   if (narrow && coarse) return 'low'
   return 'high'
+}
+
+function defaultSettings(): Settings {
+  return {
+    motion: 'auto',
+    sound: false,
+    // The scanline overlay is a full-viewport mix-blend-mode layer that has
+    // to re-blend every time anything under it moves — cheap to describe,
+    // expensive to composite. It buys atmosphere, not function, so it starts
+    // off on a device we've already flagged as tight on headroom.
+    scanlines: detectPerfTier() === 'high',
+    phaseOverride: null,
+  }
+}
+
+function loadSettings(): Settings {
+  const fallback = defaultSettings()
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (!raw) return fallback
+    return { ...fallback, ...(JSON.parse(raw) as Partial<Settings>) }
+  } catch {
+    return fallback
+  }
 }
 
 const AMBIENT_LOGS: Array<[string, LogLevel]> = [
