@@ -44,6 +44,29 @@ Ein Provider muss nur `signIn`, `restore` und `signOut` erfüllen und eine
 `JarvisSession` zurückgeben — Scan-Animation, Begrüßung, Zugriffsstufe und alle
 Gates hängen an diesem Objekt, nicht am Demo-Code.
 
+## Deployment auf GitHub Pages
+
+Pages darf **nicht** direkt aus dem Branch ausliefern — im Repository liegt
+Quellcode, kein fertiges Bundle. `index.html` würde `/src/main.tsx` laden, und
+TypeScript kann kein Browser ausführen: die Seite bliebe schwarz.
+
+Stattdessen baut `.github/workflows/deploy-pages.yml` das Projekt bei jedem Push
+und veröffentlicht `dist/`. Einmalig nötig:
+
+**Settings → Pages → Build and deployment → Source: `GitHub Actions`**
+(statt „Deploy from a branch").
+
+Danach läuft der Workflow bei jedem Push automatisch; Fortschritt und Fehler
+stehen im Tab **Actions**.
+
+Der Basis-Pfad wird im Workflow aus dem Repository-Namen gesetzt
+(`https://<user>.github.io/<repo>/`). Für eine eigene Domain oder einen Host,
+der auf `/` ausliefert:
+
+```bash
+VITE_BASE=/ npm run build
+```
+
 ## Reisedaten anpassen
 
 Alles Reisebezogene steht in `src/lib/config.ts`: Start- und Zielort, Flugnummer,
