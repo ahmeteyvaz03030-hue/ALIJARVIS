@@ -33,12 +33,9 @@ jobs:
 
       - run: npx tsc -b
 
-      # The site lives at https://<user>.github.io/<repo>/, so the bundle has
-      # to be built for that sub-path.
-      - name: Build
-        run: npm run build
-        env:
-          VITE_BASE: /${{ github.event.repository.name }}/
+      # Assets are referenced relatively, so the same bundle works at the
+      # repo sub-path, at a domain root, or anywhere else.
+      - run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
         with:

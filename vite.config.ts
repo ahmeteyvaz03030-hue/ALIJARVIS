@@ -3,16 +3,16 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 /**
- * GitHub Pages serves the site from a sub-path (…github.io/ALIJARVIS/), so the
- * production build needs a matching `base`. Override it with VITE_BASE when
- * deploying somewhere else — set VITE_BASE=/ for a custom domain or a root
- * host. `vite preview` uses the same base so it mirrors production; only the
- * dev server stays on `/`.
+ * Relative asset URLs. The built site then works from *any* location — the
+ * repo root, a GitHub Pages sub-path like /ALIJARVIS/, a custom domain, even
+ * opened straight off disk — so a deployment can never break just because the
+ * URL prefix changed. Override with VITE_BASE only if a host needs absolute
+ * paths.
  */
-const BASE = process.env.VITE_BASE ?? '/ALIJARVIS/'
+const BASE = process.env.VITE_BASE ?? './'
 
-export default defineConfig(({ command, isPreview }) => ({
-  base: command === 'build' || isPreview ? BASE : '/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? BASE : '/',
   plugins: [react(), tailwindcss()],
   build: {
     target: 'es2022',
