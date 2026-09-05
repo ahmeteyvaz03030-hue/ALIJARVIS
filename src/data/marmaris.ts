@@ -12,6 +12,8 @@ export interface Poi {
   note: string
   /** Wikipedia article candidates for a real photo, tried in order (see lib/wikiImages.ts). */
   wiki: Array<{ lang: string; title: string }>
+  /** Wikimedia Commons search term for the full photo gallery. */
+  commons: string
 }
 
 /** Points of interest that populate the MARMARIS AREA SCAN radar. */
@@ -26,6 +28,7 @@ export const POIS: Poi[] = [
     distanceKm: 0.9,
     note: 'Festung aus dem 16. Jh. über dem alten Hafen — bester Blick auf die Bucht.',
     wiki: [{ lang: 'tr', title: 'Marmaris Kalesi' }, { lang: 'en', title: 'Marmaris Castle' }],
+    commons: 'Marmaris Castle',
   },
   {
     id: 'icmeler',
@@ -37,6 +40,7 @@ export const POIS: Poi[] = [
     distanceKm: 8.4,
     note: 'Langer Kiesstrand, ruhigeres Wasser, Berge direkt im Rücken.',
     wiki: [{ lang: 'tr', title: 'İçmeler' }, { lang: 'en', title: 'İçmeler' }],
+    commons: 'İçmeler Marmaris',
   },
   {
     id: 'turunc',
@@ -48,6 +52,7 @@ export const POIS: Poi[] = [
     distanceKm: 18.6,
     note: 'Per Boot in 25 Minuten. Türkisblaue Bucht, wenig Trubel.',
     wiki: [{ lang: 'tr', title: 'Turunç, Marmaris' }, { lang: 'en', title: 'Turunç' }],
+    commons: 'Turunç Marmaris',
   },
   {
     id: 'paradise',
@@ -59,6 +64,7 @@ export const POIS: Poi[] = [
     distanceKm: 12.1,
     note: 'Nimara-Insel mit Höhle und Panoramaweg über dem Golf.',
     wiki: [{ lang: 'tr', title: 'Nimara Mağarası' }, { lang: 'en', title: 'Nimara Cave' }],
+    commons: 'Nimara Island Marmaris',
   },
   {
     id: 'sunset',
@@ -70,6 +76,7 @@ export const POIS: Poi[] = [
     distanceKm: 6.2,
     note: 'Sonnenuntergang über der Bucht — beste Zeit 19:40.',
     wiki: [{ lang: 'tr', title: 'Marmaris Günbatımı' }],
+    commons: 'Marmaris bay sunset',
   },
   {
     id: 'marina',
@@ -81,6 +88,7 @@ export const POIS: Poi[] = [
     distanceKm: 1.6,
     note: 'Yachthafen mit Promenade, Cafés und Bootstouren.',
     wiki: [{ lang: 'en', title: 'Netsel Marina' }],
+    commons: 'Marmaris marina harbour',
   },
   {
     id: 'bozburun',
@@ -92,6 +100,7 @@ export const POIS: Poi[] = [
     distanceKm: 42.0,
     note: 'Ruhiges Fischerdorf auf der Halbinsel — Gulet-Werften.',
     wiki: [{ lang: 'tr', title: 'Bozburun' }, { lang: 'en', title: 'Bozburun' }],
+    commons: 'Bozburun Marmaris',
   },
 ]
 

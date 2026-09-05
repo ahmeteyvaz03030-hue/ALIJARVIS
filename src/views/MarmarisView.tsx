@@ -1,10 +1,11 @@
-import { motion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useCallback, useEffect, useState } from 'react'
 import { useSystem } from '../state/SystemProvider'
 import { DESTINATION } from '../lib/config'
 import { EASE, calmPanelVariants, panelVariants } from '../lib/motion'
 import { useHoloTilt } from '../lib/hooks'
-import { getLandmarkImage, type WikiImage } from '../lib/wikiImages'
+import { getCommonsGallery, getLandmarkImage, type WikiImage } from '../lib/wikiImages'
+import { PhotoLightbox } from '../components/marmaris/PhotoLightbox'
 import { HoloCard } from '../components/hud/HoloCard'
 import { StatusPill } from '../components/hud/Readout'
 import { Radar } from '../components/sim/Radar'
@@ -46,15 +47,11 @@ function PoiPhoto({ poi, rgb }: { poi: Poi; rgb: string }) {
           className="absolute inset-0"
           style={{ background: 'linear-gradient(to top, rgba(4,8,13,0.92), rgba(4,8,13,0.15) 55%, transparent)' }}
         />
-        <a
-          href={photo.pageUrl}
-          target="_blank"
-          rel="noreferrer noopener"
-          onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-1 right-1.5 font-mono text-[0.45rem] tracking-[0.08em] text-ice/40 opacity-0 transition-opacity hover:text-ice/80 group-hover/holo:opacity-100"
-        >
-          FOTO: WIKIPEDIA
-        </a>
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover/holo:opacity-100">
+          <span className="border border-ice/40 bg-void/70 px-2 py-1 font-display text-[0.5rem] font-bold tracking-[0.2em] text-ice">
+            ⤢ GALERIE ÖFFNEN
+          </span>
+        </span>
       </>
     )
   }
@@ -89,11 +86,13 @@ function PoiCard({
   index,
   active,
   onSelect,
+  onOpenGallery,
 }: {
   poi: Poi
   index: number
   active: boolean
   onSelect: () => void
+  onOpenGallery: () => void
 }) {
   const { calm, cue } = useSystem()
   const tilt = useHoloTilt(6, !calm)
@@ -125,7 +124,14 @@ function PoiCard({
           willChange: 'transform',
         }}
       >
-        <div className="relative h-24 shrink-0 overflow-hidden border-b" style={{ borderColor: `rgba(${rgb},0.18)` }}>
+        <div
+          className="relative h-24 shrink-0 cursor-zoom-in overflow-hidden border-b"
+          style={{ borderColor: `rgba(${rgb},0.18)` }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpenGallery()
+          }}
+        >
           <PoiPhoto poi={poi} rgb={rgb} />
           <span
             className="absolute left-2 top-2 border px-1.5 py-0.5 font-display text-[0.44rem] font-black tracking-[0.14em]"
@@ -171,8 +177,38 @@ function PoiCard({
 }
 
 export function MarmarisView() {
-  const { calm } = useSystem()
+  const { calm, cue, pushLog } = useSystem()
   const [selected, setSelected] = useState<string>(POIS[0].id)
+  const [gallery, setGallery] = useState<{ poi: Poi; images: WikiImage[] } | null>(null)
+  const [galleryIndex, setGalleryIndex] = useState(0)
+  const [loadingGallery, setLoadingGallery] = useState<string | null>(null)
+
+  const openGallery = useCallback(
+    async (poi: Poi) => {
+      cue('confirm')
+      setLoadingGallery(poi.id)
+      // The card's own lead photo comes first, then whatever Commons has.
+      const [lead, commons] = await Promise.all([
+        getLandmarkImage(poi.wiki),
+        getCommonsGallery(poi.commons),
+      ])
+      const seen = new Set<string>()
+      const images = [...(lead ? [lead] : []), ...commons].filter((img) => {
+        if (seen.has(img.url)) return false
+        seen.add(img.url)
+        return true
+      })
+      setLoadingGallery(null)
+      if (images.length === 0) {
+        pushLog(`Keine Fotos für ${poi.name} gefunden`, 'warn')
+        return
+      }
+      setGalleryIndex(0)
+      setGallery({ poi, images })
+      pushLog(`Bildarchiv geöffnet — ${poi.name} (${images.length})`, 'info')
+    },
+    [cue, pushLog],
+  )
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
@@ -227,6 +263,7 @@ export function MarmarisView() {
               index={i}
               active={selected === poi.id}
               onSelect={() => setSelected(poi.id)}
+              onOpenGallery={() => void openGallery(poi)}
             />
           ))}
         </motion.div>
@@ -299,6 +336,34 @@ export function MarmarisView() {
           </div>
         </div>
       </HoloCard>
+
+      <AnimatePresence>
+        {gallery && (
+          <PhotoLightbox
+            key={gallery.poi.id}
+            images={gallery.images}
+            index={galleryIndex}
+            title={gallery.poi.name}
+            onIndexChange={setGalleryIndex}
+            onClose={() => setGallery(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {loadingGallery && (
+        <div className="fixed inset-0 z-[89] flex items-center justify-center bg-void/70">
+          <div className="flex items-center gap-3 border border-cyan/25 bg-void/90 px-4 py-3">
+            <motion.span
+              className="h-4 w-4 rounded-full border border-cyan/25 border-t-cyan"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+            />
+            <span className="font-mono text-[0.6rem] tracking-[0.22em] text-cyan/70">
+              LADE BILDARCHIV...
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

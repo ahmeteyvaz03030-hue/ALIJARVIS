@@ -101,3 +101,62 @@ export async function fetchBrNews(apiKey?: string | null): Promise<FortniteResul
     data: items.slice(0, 6).map((m) => ({ title: m.title, body: m.body ?? null, image: m.image ?? null })),
   }
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Cosmetic artwork                                                           */
+/* -------------------------------------------------------------------------- */
+
+export interface FortniteArt {
+  id: string
+  name: string
+  image: string
+}
+
+interface RawCosmetic {
+  id: string
+  name?: string | null
+  type?: { value?: string } | null
+  images?: { icon?: string | null; featured?: string | null; smallIcon?: string | null } | null
+}
+
+let artCache: Promise<FortniteArt[]> | null = null
+
+/**
+ * Real outfit artwork to illustrate the cup cards, the way Fortnite Tracker
+ * does. Keyless, and bounded in size: the "new cosmetics" feed is a short
+ * list, with the item shop as a second try. Failure yields an empty array and
+ * the cards simply render without art.
+ */
+export function fetchCosmeticArt(): Promise<FortniteArt[]> {
+  if (artCache) return artCache
+
+  artCache = (async () => {
+    const pick = (items: RawCosmetic[]): FortniteArt[] =>
+      items
+        .filter((c) => (c.type?.value ?? '').toLowerCase() === 'outfit')
+        .map((c) => ({
+          id: c.id,
+          name: c.name ?? c.id,
+          image: c.images?.featured ?? c.images?.icon ?? c.images?.smallIcon ?? '',
+        }))
+        .filter((c) => c.image)
+
+    const fresh = await request<{ items?: RawCosmetic[] }>('/v2/cosmetics/br/new')
+    if (fresh.ok) {
+      const art = pick(fresh.data.items ?? [])
+      if (art.length) return art
+    }
+
+    interface ShopEntry { items?: RawCosmetic[]; brItems?: RawCosmetic[] }
+    const shop = await request<{ featured?: { entries?: ShopEntry[] }; entries?: ShopEntry[] }>('/v2/shop')
+    if (shop.ok) {
+      const entries = shop.data.entries ?? shop.data.featured?.entries ?? []
+      const items = entries.flatMap((e) => e.brItems ?? e.items ?? [])
+      return pick(items)
+    }
+    return []
+  })()
+
+  return artCache
+}
