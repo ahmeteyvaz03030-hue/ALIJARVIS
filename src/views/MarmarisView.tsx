@@ -7,6 +7,7 @@ import { useHoloTilt } from '../lib/hooks'
 import { getCommonsGallery, getLandmarkImage, type WikiImage } from '../lib/wikiImages'
 import { PhotoLightbox } from '../components/marmaris/PhotoLightbox'
 import { HoloCard } from '../components/hud/HoloCard'
+import { CurrencyConverter } from '../components/money/CurrencyConverter'
 import { StatusPill } from '../components/hud/Readout'
 import { Radar } from '../components/sim/Radar'
 import { WeatherPanel } from '../components/weather/WeatherPanel'
@@ -212,6 +213,9 @@ export function MarmarisView() {
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+      {/* --------------------------------------------------------- converter */}
+      <CurrencyConverter index={0} className="lg:col-span-12" />
+
       {/* ------------------------------------------------------------- radar */}
       <HoloCard
         index={0}

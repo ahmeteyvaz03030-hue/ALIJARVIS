@@ -89,9 +89,12 @@ function Ticker() {
 export function TopBar({
   session,
   onSignOut,
+  onOpenConsole,
 }: {
   session: JarvisSession
   onSignOut: () => void
+  /** Opens the RonalJarvis console — also on ⌘K / Strg+K. */
+  onOpenConsole?: () => void
 }) {
   const { settings, patchSettings, phase, calm, cue, fx } = useSystem()
 
@@ -141,6 +144,29 @@ export function TopBar({
               {PHASE_LABEL[phase]}
             </StatusPill>
           </div>
+
+          {onOpenConsole && (
+            <button
+              type="button"
+              onClick={() => {
+                cue('process')
+                onOpenConsole()
+              }}
+              title="RonalJarvis fragen (⌘K / Strg+K)"
+              aria-label="RonalJarvis fragen"
+              className="flex items-center gap-1.5 border border-cyan/25 bg-cyan/[0.05] px-1.5 py-1 transition-colors hover:border-cyan/60 sm:px-2"
+            >
+              <span className="h-1.5 w-1.5 rotate-45 bg-cyan" aria-hidden="true" />
+              {/* The label is the first thing to go on a phone — the top bar has
+                  to fit the clock, the toggles and the operator badge too. */}
+              <span className="hidden font-display text-[0.52rem] font-black tracking-[0.18em] text-cyan sm:inline">
+                FRAGEN
+              </span>
+              <span className="hidden font-mono text-[0.48rem] tracking-[0.1em] text-cyan/40 lg:inline">
+                ⌘K
+              </span>
+            </button>
+          )}
 
           <Clock />
 

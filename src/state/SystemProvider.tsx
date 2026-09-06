@@ -11,6 +11,7 @@ import {
 import { animate, useMotionValue, type MotionValue } from 'framer-motion'
 import { playCue, setAudioEnabled, type Cue } from '../lib/audio'
 import { resolvePhase, type FlightPhase } from '../lib/config'
+import type { JarvisMode } from '../lib/jarvisModes'
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
@@ -61,6 +62,12 @@ export interface Settings {
   tmdbApiKey: string | null
   /** Operator's own fortniteapi.io key — see src/lib/fortniteEvents.ts. Sent only to fortniteapi.io. */
   fortniteApiKey: string | null
+  /** Epic display name, so the tracker and RonalJarvis can look Ali up by themselves. */
+  epicName: string | null
+  /** Optional supporter key for thesportsdb.com; the free tier works without one. */
+  sportsDbKey: string | null
+  /** Forced interface mode; `null` lets the situation decide. See src/lib/jarvisModes.ts. */
+  modeOverride: JarvisMode | null
 }
 
 export type LogLevel = 'info' | 'ok' | 'warn' | 'core'
@@ -137,6 +144,9 @@ function defaultSettings(): Settings {
     phaseOverride: null,
     tmdbApiKey: null,
     fortniteApiKey: null,
+    epicName: null,
+    sportsDbKey: null,
+    modeOverride: null,
   }
 }
 

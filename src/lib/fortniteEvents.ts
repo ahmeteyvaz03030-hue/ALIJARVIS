@@ -85,6 +85,11 @@ interface RawEvent {
   poster?: string
 }
 
+/** A changed endpoint must degrade to "no cups", never take the view down. */
+function asArray<T>(value: T[] | undefined): T[] {
+  return Array.isArray(value) ? value : []
+}
+
 function firstString(...values: unknown[]): string | null {
   for (const v of values) if (typeof v === 'string' && v) return v
   return null
@@ -112,12 +117,12 @@ export async function fetchLiveCups(apiKey: string, region = 'EU'): Promise<IoRe
   if (!result.ok) return result
 
   const cups: LiveCup[] = []
-  for (const event of result.data.events ?? []) {
+  for (const event of asArray(result.data.events)) {
     const name =
       firstString(event.displayName, event.name, event.shortDescription, event.eventId, event.id) ??
       'Unbenannter Cup'
     const image = firstString(event.image, event.poster)
-    for (const win of event.windows ?? []) {
+    for (const win of asArray(event.windows)) {
       const begin = firstString(win.beginTime)
       const end = firstString(win.endTime)
       if (!begin || !end) continue

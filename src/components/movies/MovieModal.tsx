@@ -236,7 +236,7 @@ export function MovieModal({
     if (!apiKey || !movie.tmdbId) return
     let cancelled = false
     setDetailLoading(true)
-    void loadDetail(apiKey, movie.tmdbId).then((result) => {
+    void loadDetail(apiKey, movie.tmdbId, mediaType).then((result) => {
       if (cancelled) return
       setDetailLoading(false)
       if (result) setDetail(result)
@@ -245,7 +245,7 @@ export function MovieModal({
     return () => {
       cancelled = true
     }
-  }, [apiKey, movie.tmdbId, pushLog])
+  }, [apiKey, movie.tmdbId, mediaType, pushLog])
 
   // Scene stills load separately so a slow/empty images response never holds
   // up the runtime and trailer information.

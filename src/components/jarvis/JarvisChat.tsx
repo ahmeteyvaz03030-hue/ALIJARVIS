@@ -1,41 +1,50 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useStats, useSystem } from '../../state/SystemProvider'
-import { useCountdown, useTypewriter } from '../../lib/hooks'
+import { useSystem } from '../../state/SystemProvider'
+import { useTypewriter } from '../../lib/hooks'
 import { EASE } from '../../lib/motion'
-import { TRIP } from '../../lib/config'
-import { PROCESS_STEPS, respond } from '../../lib/jarvisBrain'
+import { MODE_SPEC } from '../../lib/jarvisModes'
+import { PROCESS_STEPS } from '../../lib/jarvis/brain'
+import type { JarvisAnswer } from '../../lib/jarvis/types'
+import { useJarvisBrain } from './useJarvisBrain'
+import { AnswerBlocks } from './AnswerBlocks'
 import { HudButton } from '../hud/HudButton'
 
 interface Turn {
   id: number
   role: 'ali' | 'jarvis'
   text: string
+  answer?: JarvisAnswer
   /** Freshly generated answers type themselves; history renders instantly. */
   fresh?: boolean
 }
 
-const SUGGESTIONS = [
-  'Wie lange noch bis zum Abflug?',
-  'Wie ist das Wetter in Marmaris?',
-  'Was läuft an Filmen?',
-  'Systemstatus?',
+export const SUGGESTIONS = [
+  'Was läuft heute?',
+  'Wie sind meine Fortnite Stats?',
+  'Wann spielt Beşiktaş?',
+  'Welche Filme sind neu?',
+  'Empfiehl mir einen Actionfilm.',
+  'Zeig mir meine Watchlist.',
+  'Wann geht mein Flug?',
+  'Wie viel sind 250 Euro in Lira?',
 ]
 
-/** Answer bubble with the typewriter effect. */
-function JarvisAnswer({
-  text,
-  fresh,
+/** Answer bubble with the typewriter effect, then the structured blocks. */
+function JarvisAnswerBubble({
+  turn,
   onStart,
   onEnd,
+  onNavigate,
 }: {
-  text: string
-  fresh: boolean
+  turn: Turn
   onStart: () => void
   onEnd: () => void
+  onNavigate?: (view: string) => void
 }) {
   const { calm } = useSystem()
   const started = useRef(false)
+  const fresh = Boolean(turn.fresh)
 
   useEffect(() => {
     if (fresh && !started.current) {
@@ -44,18 +53,19 @@ function JarvisAnswer({
     }
   }, [fresh, onStart])
 
-  const { shown, done, skip } = useTypewriter(text, {
-    cps: calm ? 4000 : 46,
+  const { shown, done, skip } = useTypewriter(turn.text, {
+    cps: calm ? 4000 : 52,
     enabled: fresh,
     onDone: fresh ? onEnd : undefined,
   })
 
+  const blocks = turn.answer?.blocks ?? []
+  const actions = turn.answer?.actions.filter((a) => a.view) ?? []
+
   return (
     <div
       className="relative border border-cyan/22 bg-cyan/[0.05] px-3 py-2.5"
-      style={{
-        clipPath: 'polygon(0 8px, 8px 0, 100% 0, 100% 100%, 0 100%)',
-      }}
+      style={{ clipPath: 'polygon(0 8px, 8px 0, 100% 0, 100% 100%, 0 100%)' }}
       onClick={() => !done && skip()}
     >
       <div className="mb-1 flex items-center gap-1.5">
@@ -66,21 +76,51 @@ function JarvisAnswer({
       </div>
       <p className="text-[0.84rem] leading-relaxed text-ice/90">
         {shown}
-        {!done && <span className="jv-blink ml-0.5 inline-block h-3.5 w-1.5 translate-y-[1px] bg-cyan" />}
+        {!done && (
+          <span className="jv-blink ml-0.5 inline-block h-3.5 w-1.5 translate-y-[1px] bg-cyan" />
+        )}
       </p>
+
+      {/* Blocks wait for the line to finish so the answer lands as one thought. */}
+      {done && <AnswerBlocks blocks={blocks} />}
+
+      {done && actions.length > 0 && onNavigate && (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {actions.map((action) => (
+            <button
+              key={action.label + action.view}
+              type="button"
+              onClick={() => onNavigate(action.view)}
+              className="border border-cyan/25 bg-cyan/[0.06] px-2 py-0.5 font-mono text-[0.56rem] tracking-[0.1em] text-cyan/80 transition-colors hover:border-cyan/60 hover:text-cyan"
+            >
+              → {action.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-export function JarvisChat() {
-  const { phase, calm, cue, pushLog, pulseCore, setJarvisSpeaking } = useSystem()
-  const stats = useStats()
-  const countdown = useCountdown(TRIP.departure)
-  const [turns, setTurns] = useState<Turn[]>([
+export function JarvisChat({
+  unread = 0,
+  onNavigate,
+  compact = false,
+  autoFocus = false,
+}: {
+  unread?: number
+  onNavigate?: (view: string) => void
+  /** The console variant drops the suggestion row once a conversation starts. */
+  compact?: boolean
+  autoFocus?: boolean
+}) {
+  const { calm, cue, pushLog, pulseCore, setJarvisSpeaking } = useSystem()
+  const { ask, mode } = useJarvisBrain(unread)
+  const [turns, setTurns] = useState<Turn[]>(() => [
     {
       id: 0,
       role: 'jarvis',
-      text: 'RonalJarvis Core online. Ich habe Reisedaten, Marmaris-Intel, Entertainment-Index und den Kanal zu Tony geladen. Wie kann ich helfen, Ali?',
+      text: `${MODE_SPEC[mode].greeting} Ich lese Beşiktaş, Fortnite, Entertainment, Reise, Wetter und deine Listen — frag einfach.`,
     },
   ])
   const [draft, setDraft] = useState('')
@@ -88,16 +128,21 @@ export function JarvisChat() {
   const [processStep, setProcessStep] = useState(0)
   const idRef = useRef(1)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const timers = useRef<number[]>([])
 
   useEffect(() => () => timers.current.forEach(window.clearTimeout), [])
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus()
+  }, [autoFocus])
 
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: calm ? 'auto' : 'smooth' })
   }, [turns.length, processing, calm])
 
-  const ask = useCallback(
+  const send = useCallback(
     (question: string) => {
       const trimmed = question.trim()
       if (!trimmed || processing) return
@@ -110,35 +155,31 @@ export function JarvisChat() {
       cue('process')
       pushLog(`Core query: ${trimmed.slice(0, 42)}`, 'core')
 
-      const stepMs = calm ? 90 : 420
+      const stepMs = calm ? 90 : 340
       PROCESS_STEPS.forEach((_, i) => {
         if (i === 0) return
         timers.current.push(window.setTimeout(() => setProcessStep(i), i * stepMs))
       })
 
-      timers.current.push(
-        window.setTimeout(
-          () => {
-            const answer = respond(trimmed, {
-              phase,
-              daysToFlight: countdown.days,
-              hoursToFlight: countdown.hours,
-              cpu: stats.cpu,
-              network: stats.network,
-              unreadFromTony: 0,
-            })
-            setProcessing(false)
-            setTurns((prev) => [
-              ...prev,
-              { id: ++idRef.current, role: 'jarvis', text: answer, fresh: true },
-            ])
-          },
-          PROCESS_STEPS.length * stepMs + (calm ? 60 : 260),
-        ),
-      )
+      // The answer and the "thinking" animation race; whichever is slower wins,
+      // so a cached answer still reads as deliberate and a slow module never
+      // cuts the animation short.
+      const floor = new Promise<void>((resolve) => {
+        timers.current.push(window.setTimeout(resolve, PROCESS_STEPS.length * stepMs))
+      })
+
+      void Promise.all([ask(trimmed), floor]).then(([result]) => {
+        setProcessing(false)
+        setTurns((prev) => [
+          ...prev,
+          { id: ++idRef.current, role: 'jarvis', text: result.say, answer: result, fresh: true },
+        ])
+      })
     },
-    [calm, countdown.days, countdown.hours, cue, phase, processing, pulseCore, pushLog, stats.cpu, stats.network],
+    [ask, calm, cue, processing, pulseCore, pushLog],
   )
+
+  const showSuggestions = !compact || turns.length <= 1
 
   return (
     <div className="flex h-full min-h-[22rem] flex-col">
@@ -171,19 +212,18 @@ export function JarvisChat() {
               initial={{ opacity: 0, x: -18 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.36, ease: EASE.out }}
-              className="max-w-[92%]"
+              className="max-w-[95%]"
             >
-              <JarvisAnswer
-                text={turn.text}
-                fresh={Boolean(turn.fresh)}
+              <JarvisAnswerBubble
+                turn={turn}
                 onStart={() => setJarvisSpeaking(true)}
                 onEnd={() => setJarvisSpeaking(false)}
+                onNavigate={onNavigate}
               />
             </motion.div>
           ),
         )}
 
-        {/* processing state */}
         <AnimatePresence>
           {processing && (
             <motion.div
@@ -212,7 +252,6 @@ export function JarvisChat() {
                   </motion.span>
                 </AnimatePresence>
               </div>
-              {/* thinking bars */}
               <div className="mt-2 flex items-end gap-[3px]">
                 {Array.from({ length: 22 }, (_, i) => (
                   <motion.span
@@ -233,31 +272,33 @@ export function JarvisChat() {
         </AnimatePresence>
       </div>
 
-      {/* suggestions */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {SUGGESTIONS.map((s) => (
-          <motion.button
-            key={s}
-            type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={() => ask(s)}
-            disabled={processing}
-            className="border border-cyan/18 bg-cyan/[0.04] px-2 py-1 font-mono text-[0.56rem] tracking-[0.1em] text-cyan/70 transition-colors hover:border-cyan/45 hover:text-cyan disabled:opacity-40"
-          >
-            {s}
-          </motion.button>
-        ))}
-      </div>
+      {showSuggestions && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {SUGGESTIONS.slice(0, compact ? 8 : 5).map((s) => (
+            <motion.button
+              key={s}
+              type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => send(s)}
+              disabled={processing}
+              className="border border-cyan/18 bg-cyan/[0.04] px-2 py-1 font-mono text-[0.56rem] tracking-[0.1em] text-cyan/70 transition-colors hover:border-cyan/45 hover:text-cyan disabled:opacity-40"
+            >
+              {s}
+            </motion.button>
+          ))}
+        </div>
+      )}
 
       <form
         className="mt-3 flex items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault()
-          ask(draft)
+          send(draft)
         }}
       >
         <input
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Frag RonalJarvis..."

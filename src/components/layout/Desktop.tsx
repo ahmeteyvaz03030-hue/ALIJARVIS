@@ -13,18 +13,26 @@ import { TravelView } from '../../views/TravelView'
 import { MarmarisView } from '../../views/MarmarisView'
 import { MoviesView } from '../../views/MoviesView'
 import { FortniteView } from '../../views/FortniteView'
+import { BesiktasView } from '../../views/BesiktasView'
+import { ProfileView } from '../../views/ProfileView'
 import { TasksView } from '../../views/TasksView'
 import { CommsView } from '../../views/CommsView'
 import { SettingsView } from '../../views/SettingsView'
 import { ArrivalSequence } from '../travel/ArrivalSequence'
 import { FlightModeCinematic, FlightModeStrip } from '../travel/FlightModeBanner'
+import { JarvisConsole } from '../jarvis/JarvisConsole'
+import { ModeBanner } from './ModeBanner'
+import { useHub } from '../../state/DataHub'
+import { MODE_SPEC } from '../../lib/jarvisModes'
 
 const VIEW_TITLE: Record<ViewId, string> = {
   home: 'CORE OVERVIEW',
+  profile: 'ALI DATABASE',
   travel: 'TRAVEL OPERATIONS',
   marmaris: 'MARMARIS INTEL',
   movies: 'ENTERTAINMENT INDEX',
   fortnite: 'FORTNITE TRACKER',
+  besiktas: 'BEŞIKTAŞ COMMAND',
   tasks: 'REMINDER LOG',
   comms: 'PRIVATE CHANNEL',
   settings: 'SYSTEM CONFIGURATION',
@@ -61,11 +69,25 @@ export function Desktop({
   onReplayBoot: () => void
 }) {
   const { phase, calm, cue, pushLog } = useSystem()
+  const { mode } = useHub()
   const comms = useComms()
   const { open: openTasks } = useTodos()
   const [view, setView] = useState<ViewId>('home')
   const [cinematic, setCinematic] = useState<'none' | 'flight' | 'arrival'>('none')
+  const [consoleOpen, setConsoleOpen] = useState(false)
   const lastPhase = useRef(phase)
+
+  /* The mode paints the whole interface, so it is applied to the root element
+     rather than threaded through every panel. */
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.jarvisMode = mode
+    root.style.setProperty('--jv-accent', MODE_SPEC[mode].accent)
+    return () => {
+      root.style.removeProperty('--jv-accent')
+      delete root.dataset.jarvisMode
+    }
+  }, [mode])
 
   /* Fire the phase cinematics — once on entry, or on demand from settings. */
   useEffect(() => {
@@ -89,16 +111,42 @@ export function Desktop({
     [pushLog, view],
   )
 
+  /** Answers can offer a jump; the brain only knows the id as a string. */
+  const navigate = useCallback(
+    (id: string) => {
+      if (VIEW_TITLE[id as ViewId]) select(id as ViewId)
+    },
+    [select],
+  )
+
+  /* ⌘K / Strg+K reaches RonalJarvis from any module. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setConsoleOpen((o) => !o)
+        cue('process')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [cue])
+
   const flightStrip = phase === 'flight_day' || phase === 'in_flight'
   const variants = calm ? calmViewVariants : viewVariants
 
   return (
     <div className="relative min-h-screen">
-      <TopBar session={session} onSignOut={onSignOut} />
+      <TopBar session={session} onSignOut={onSignOut} onOpenConsole={() => setConsoleOpen(true)} />
 
       <AnimatePresence>{flightStrip && <FlightModeStrip inFlight={phase === 'in_flight'} />}</AnimatePresence>
 
-      <div className="flex">
+      <ModeBanner mode={mode} onOpen={() => select('settings')} />
+
+      {/* While the console is open the page behind it is inert: the backdrop
+          already blocks the mouse, but without this the chat and the nav stay
+          tab-reachable underneath a modal dialog. */}
+      <div className="flex" inert={consoleOpen}>
         <NavRail
           active={view}
           onSelect={select}
@@ -144,11 +192,15 @@ export function Desktop({
               animate="visible"
               exit="exit"
             >
-              {view === 'home' && <HomeView session={session} />}
+              {view === 'home' && (
+                <HomeView session={session} unread={comms.unread} onNavigate={navigate} />
+              )}
+              {view === 'profile' && <ProfileView />}
               {view === 'travel' && <TravelView />}
               {view === 'marmaris' && <MarmarisView />}
               {view === 'movies' && <MoviesView onOpenSettings={() => select('settings')} />}
               {view === 'fortnite' && <FortniteView />}
+              {view === 'besiktas' && <BesiktasView />}
               {view === 'tasks' && <TasksView />}
               {view === 'comms' && <CommsView comms={comms} />}
               {view === 'settings' && (
@@ -170,6 +222,13 @@ export function Desktop({
           </AnimatePresence>
         </main>
       </div>
+
+      <JarvisConsole
+        open={consoleOpen}
+        unread={comms.unread}
+        onClose={() => setConsoleOpen(false)}
+        onNavigate={navigate}
+      />
 
       {/* phase cinematics */}
       <AnimatePresence>

@@ -5,18 +5,22 @@ import {
   IconComms,
   IconCore,
   IconFilm,
+  IconIdCard,
   IconPin,
   IconPlane,
   IconSettings,
+  IconShield,
   IconTrophy,
 } from './Icons'
 
 export type ViewId =
   | 'home'
+  | 'profile'
   | 'travel'
   | 'marmaris'
   | 'movies'
   | 'fortnite'
+  | 'besiktas'
   | 'tasks'
   | 'comms'
   | 'settings'
@@ -30,10 +34,12 @@ interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'HOME', code: 'CORE', Icon: IconCore },
+  { id: 'profile', label: 'ALI DATABASE', code: 'ALI', Icon: IconIdCard },
   { id: 'travel', label: 'TRAVEL', code: 'FLGT', Icon: IconPlane },
   { id: 'marmaris', label: 'MARMARIS', code: 'GEO', Icon: IconPin },
   { id: 'movies', label: 'MOVIES', code: 'ENT', Icon: IconFilm },
   { id: 'fortnite', label: 'FORTNITE', code: 'GAME', Icon: IconTrophy },
+  { id: 'besiktas', label: 'BEŞIKTAŞ', code: 'BJK', Icon: IconShield },
   { id: 'tasks', label: 'TASKS', code: 'TSK', Icon: IconChecklist },
   { id: 'comms', label: 'TONY COMMS', code: 'COM', Icon: IconComms },
   { id: 'settings', label: 'SETTINGS', code: 'SYS', Icon: IconSettings },
@@ -211,7 +217,9 @@ function DockButton({
       type="button"
       onClick={onClick}
       whileTap={{ scale: 0.9 }}
-      className="relative flex flex-1 flex-col items-center gap-0.5 py-2"
+      // min-w-0 lets ten items share a phone's width; without it each button
+      // keeps its label's intrinsic width and the dock pushes the page sideways.
+      className="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2"
       aria-current={active ? 'page' : undefined}
       aria-label={item.label}
     >
@@ -227,7 +235,7 @@ function DockButton({
         <Icon size={18} />
       </span>
       <span
-        className={`relative font-display text-[0.44rem] font-bold tracking-[0.1em] ${
+        className={`relative max-w-full truncate font-display text-[0.42rem] font-bold tracking-[0.06em] ${
           active ? 'text-ice' : 'text-cyan/40'
         }`}
       >

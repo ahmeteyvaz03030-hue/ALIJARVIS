@@ -6,6 +6,9 @@ import { authProvider, type JarvisSession } from '../lib/auth'
 import { EASE } from '../lib/motion'
 import { validateApiKey } from '../lib/tmdb'
 import { validateIoKey } from '../lib/fortniteEvents'
+import { JARVIS_MODES, MODE_SPEC } from '../lib/jarvisModes'
+import { findTeam } from '../lib/football'
+import { useHub } from '../state/DataHub'
 import { HoloCard } from '../components/hud/HoloCard'
 import { HudButton } from '../components/hud/HudButton'
 import { StatusPill } from '../components/hud/Readout'
@@ -14,7 +17,7 @@ import { StatusPill } from '../components/hud/Readout'
 type KeyStatus = 'saved' | 'none' | 'checking' | 'valid' | 'invalid' | 'unreachable'
 
 /** Which stored key a card edits — both are plain strings in Settings. */
-type KeySetting = 'tmdbApiKey' | 'fortniteApiKey'
+type KeySetting = 'tmdbApiKey' | 'fortniteApiKey' | 'sportsDbKey'
 
 interface ApiKeyCardProps {
   index: number
@@ -413,9 +416,18 @@ export function SettingsView({
       {/* ----------------------------------------------------- competitive data */}
       <FortniteKeyCard index={3} />
 
+      {/* ----------------------------------------------------------- football */}
+      <SportsKeyCard index={4} />
+
+      {/* --------------------------------------------------------- identity ops */}
+      <OperatorCard index={5} />
+
+      {/* -------------------------------------------------------------- modes */}
+      <ModeCard index={6} />
+
       {/* ---------------------------------------------------------- simulation */}
       <HoloCard
-        index={4}
+        index={7}
         tone="amber"
         title="Mission Simulation"
         status="DEMO"
@@ -482,5 +494,158 @@ export function SettingsView({
         </div>
       </HoloCard>
     </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Football, identity and modes                                               */
+/* -------------------------------------------------------------------------- */
+
+function SportsKeyCard({ index }: { index: number }) {
+  return (
+    <ApiKeyCard
+      index={index}
+      setting="sportsDbKey"
+      tone="cyan"
+      title="Sport Data Source"
+      badge="THESPORTSDB"
+      service="TheSportsDB"
+      inputLabel="TheSportsDB Schlüssel (optional)"
+      validate={(key) =>
+        findTeam(key).then((r) =>
+          r.ok ? { ok: true } : { ok: false, code: 'NETWORK', message: r.message },
+        )
+      }
+      connectedNote="Beşiktaş-Modul nutzt deinen eigenen Zugang"
+      disconnectedNote="Beşiktaş-Modul nutzt den freien Zugang"
+      description={
+        <>
+          Spielplan und Süper-Lig-Tabelle kommen von thesportsdb.com. Der freie Zugang reicht
+          normalerweise — nur wenn er gerade ausgelastet ist, hilft ein eigener Unterstützer-
+          Schlüssel. Er bleibt in diesem Browser und geht nur an thesportsdb.com.
+        </>
+      }
+    />
+  )
+}
+
+/** Epic name — the one piece of identity the assistant needs to answer for Ali. */
+function OperatorCard({ index }: { index: number }) {
+  const { settings, patchSettings, cue, pushLog } = useSystem()
+  const [draft, setDraft] = useState(settings.epicName ?? '')
+
+  const save = () => {
+    const value = draft.trim()
+    patchSettings({ epicName: value || null })
+    cue(value ? 'confirm' : 'nav')
+    pushLog(value ? `Epic-Name gesetzt: ${value}` : 'Epic-Name entfernt', 'ok')
+  }
+
+  return (
+    <HoloCard index={index} tone="lime" title="Operator Identity" status="EPIC" className="lg:col-span-12">
+      <p className="mb-4 max-w-2xl text-[0.8rem] leading-relaxed text-ice/65">
+        Mit hinterlegtem Epic-Namen beantwortet RonalJarvis „Wie sind meine Fortnite Stats?"
+        direkt, und der Spieler-Tracker öffnet sich auf deinem eigenen Profil, statt auf einem
+        leeren Suchfeld.
+      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label className="hud-label mb-1.5 block" htmlFor="epic-name">
+            Epic-Anzeigename
+          </label>
+          <input
+            id="epic-name"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="z. B. AliBei23"
+            className="hud-input text-left text-[0.85rem]"
+            style={{ letterSpacing: 'normal' }}
+          />
+        </div>
+        <div className="shrink-0">
+          <HudButton variant="primary" onClick={save}>
+            Speichern
+          </HudButton>
+        </div>
+      </div>
+      <div className="mt-4 flex items-center gap-2 border-t border-lime/12 pt-4">
+        <StatusPill tone={settings.epicName ? 'lime' : 'cyan'}>
+          {settings.epicName ? `VERKNÜPFT · ${settings.epicName.toUpperCase()}` : 'NICHT GESETZT'}
+        </StatusPill>
+      </div>
+    </HoloCard>
+  )
+}
+
+function ModeCard({ index }: { index: number }) {
+  const { settings, patchSettings, cue, pushLog } = useSystem()
+  const { mode } = useHub()
+
+  return (
+    <HoloCard index={index} tone="violet" title="Interface Modes" status={MODE_SPEC[mode].label} className="lg:col-span-12">
+      <p className="mb-4 max-w-2xl text-[0.8rem] leading-relaxed text-ice/65">
+        Das Interface ordnet sich nach der Lage: Flugtag schiebt Reise nach vorn, ein naher
+        Beşiktaş-Anpfiff macht Spieltag daraus, nachts wird das HUD ruhiger. AUTO überlässt das
+        RonalJarvis — oder du stellst den Modus fest ein, um ihn dir anzusehen.
+      </p>
+
+      <div className="flex flex-wrap gap-1.5">
+        <HudButton
+          small
+          variant={settings.modeOverride === null ? 'primary' : 'ghost'}
+          onClick={() => {
+            patchSettings({ modeOverride: null })
+            cue('nav')
+          }}
+        >
+          AUTO
+        </HudButton>
+        {JARVIS_MODES.map((id) => (
+          <HudButton
+            key={id}
+            small
+            variant={settings.modeOverride === id ? 'primary' : 'ghost'}
+            onClick={() => {
+              patchSettings({ modeOverride: id })
+              cue('confirm')
+              pushLog(`Interface → ${MODE_SPEC[id].label}`, 'warn')
+            }}
+          >
+            {MODE_SPEC[id].glyph} {MODE_SPEC[id].label.replace(' MODE', '')}
+          </HudButton>
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-1.5 border-t border-violet/12 pt-4 sm:grid-cols-2">
+        {JARVIS_MODES.map((id) => (
+          <div
+            key={id}
+            className="flex items-baseline gap-2 border-l-2 pl-2"
+            style={{
+              borderColor: id === mode ? `rgb(${MODE_SPEC[id].accent})` : 'rgba(53,230,255,0.15)',
+            }}
+          >
+            <span
+              className="shrink-0 font-display text-[0.56rem] font-black tracking-[0.16em]"
+              style={{ color: id === mode ? `rgb(${MODE_SPEC[id].accent})` : 'rgba(216,246,255,0.6)' }}
+            >
+              {MODE_SPEC[id].label}
+            </span>
+            <span className="text-[0.72rem] leading-relaxed text-ice/50">{MODE_SPEC[id].hint}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-violet/12 pt-4">
+        <StatusPill tone={settings.modeOverride ? 'amber' : 'lime'}>
+          {settings.modeOverride ? 'FEST EINGESTELLT' : 'AUTOMATISCH'}
+        </StatusPill>
+        <span className="font-mono text-[0.58rem] tracking-[0.14em] text-cyan/45">
+          AKTIV: {MODE_SPEC[mode].label}
+        </span>
+      </div>
+    </HoloCard>
   )
 }

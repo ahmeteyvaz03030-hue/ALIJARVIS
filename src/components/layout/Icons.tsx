@@ -111,3 +111,20 @@ export const IconTrophy = ({ className, size = 20 }: IconProps) => (
     <path d="M12 14v3M9 21h6M9.5 21c0-2 1-3 2.5-4 1.5 1 2.5 2 2.5 4" />
   </svg>
 )
+
+/** Club crest — the Beşiktaş module. */
+export const IconShield = ({ className, size = 20 }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 2.5 4.5 5.5v6c0 4.6 3.2 8.6 7.5 10 4.3-1.4 7.5-5.4 7.5-10v-6L12 2.5Z" />
+    <path d="M8.5 10.5h7M8.5 13.5h7" />
+  </svg>
+)
+
+/** Operator record — the ALI DATABASE view. */
+export const IconIdCard = ({ className, size = 20 }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <rect x="2.5" y="4.5" width="19" height="15" rx="1.5" />
+    <circle cx="8.5" cy="11" r="2.2" />
+    <path d="M5 16.2c.6-1.5 2-2.3 3.5-2.3s2.9.8 3.5 2.3M14.5 9.5h4M14.5 12.5h4M14.5 15.5h2.5" />
+  </svg>
+)

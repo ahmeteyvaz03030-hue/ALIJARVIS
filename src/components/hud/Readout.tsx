@@ -40,7 +40,7 @@ interface SegmentBarProps {
   /** 0–100 */
   value: number
   segments?: number
-  tone?: 'cyan' | 'lime' | 'amber' | 'danger'
+  tone?: 'cyan' | 'lime' | 'amber' | 'danger' | 'violet'
   className?: string
 }
 
@@ -49,6 +49,7 @@ const TONE: Record<string, string> = {
   lime: '124,255,155',
   amber: '255,181,77',
   danger: '255,90,110',
+  violet: '169,123,255',
 }
 
 /** The `████████░░░` readout from the boot screen, as a live component. */
@@ -87,7 +88,7 @@ interface StatRowProps {
   label: string
   value: ReactNode
   bar?: number
-  tone?: 'cyan' | 'lime' | 'amber' | 'danger'
+  tone?: 'cyan' | 'lime' | 'amber' | 'danger' | 'violet'
 }
 
 export function StatRow({ label, value, bar, tone = 'cyan' }: StatRowProps) {
@@ -117,7 +118,7 @@ export function StatusPill({
   pulse = true,
 }: {
   children: ReactNode
-  tone?: 'cyan' | 'lime' | 'amber' | 'danger'
+  tone?: 'cyan' | 'lime' | 'amber' | 'danger' | 'violet'
   pulse?: boolean
 }) {
   const { calm, fx } = useSystem()

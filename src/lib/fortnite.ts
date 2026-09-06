@@ -71,6 +71,9 @@ interface RawPlaylist {
 export async function fetchActivePlaylists(apiKey?: string | null): Promise<FortniteResult<FortnitePlaylist[]>> {
   const result = await request<RawPlaylist[]>('/v2/playlists', apiKey)
   if (!result.ok) return result
+  // The payload is declared as a list, but a changed endpoint or an error body
+  // wrapped in a 200 would take the whole view down here rather than degrade.
+  if (!Array.isArray(result.data)) return { ok: true, data: [] }
   const mapped = result.data
     // Ranked/limited-time/event playlists are what reads as "current events" —
     // the endless list of core Battle Royale duo/squad variants doesn't.
@@ -95,7 +98,8 @@ interface RawNewsMotd {
 export async function fetchBrNews(apiKey?: string | null): Promise<FortniteResult<FortniteNewsItem[]>> {
   const result = await request<{ motds?: RawNewsMotd[]; messages?: RawNewsMotd[] }>('/v2/news/br', apiKey)
   if (!result.ok) return result
-  const items = result.data.motds ?? result.data.messages ?? []
+  const raw = result.data.motds ?? result.data.messages ?? []
+  const items = Array.isArray(raw) ? raw : []
   return {
     ok: true,
     data: items.slice(0, 6).map((m) => ({ title: m.title, body: m.body ?? null, image: m.image ?? null })),
@@ -133,7 +137,7 @@ export function fetchCosmeticArt(): Promise<FortniteArt[]> {
 
   artCache = (async () => {
     const pick = (items: RawCosmetic[]): FortniteArt[] =>
-      items
+      (Array.isArray(items) ? items : [])
         .filter((c) => (c.type?.value ?? '').toLowerCase() === 'outfit')
         .map((c) => ({
           id: c.id,

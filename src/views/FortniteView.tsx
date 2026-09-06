@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSystem } from '../state/SystemProvider'
 import { useCountdown } from '../lib/hooks'
 import { EASE, seeded } from '../lib/motion'
@@ -7,12 +7,11 @@ import {
   fetchActivePlaylists,
   fetchBrNews,
   fetchCosmeticArt,
-  fetchStatus,
   type FortniteArt,
   type FortniteNewsItem,
   type FortnitePlaylist,
 } from '../lib/fortnite'
-import { fetchLiveCups, lookupPlayer, type PlayerStats } from '../lib/fortniteEvents'
+import { fetchLiveCups, lookupPlayer, type LiveCup, type PlayerStats } from '../lib/fortniteEvents'
 import {
   getCupSchedule,
   REGIONS,
@@ -22,6 +21,9 @@ import {
 import { HoloCard } from '../components/hud/HoloCard'
 import { HudButton } from '../components/hud/HudButton'
 import { StatusPill } from '../components/hud/Readout'
+import { AimTrainer } from '../components/fortnite/AimTrainer'
+import { SensFinder } from '../components/fortnite/SensFinder'
+import { useSlice } from '../state/DataHub'
 
 const WEEKDAY = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA']
 
@@ -177,29 +179,54 @@ function StatTile({ label, value, tone = 'cyan' }: { label: string; value: strin
 }
 
 function PlayerTracker({ index, apiKey }: { index: number; apiKey: string | null }) {
-  const { cue, pushLog } = useSystem()
-  const [name, setName] = useState('')
+  const { cue, pushLog, settings, patchSettings } = useSystem()
+  const [name, setName] = useState(settings.epicName ?? '')
   const [busy, setBusy] = useState(false)
   const [player, setPlayer] = useState<PlayerStats | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const auto = useRef(false)
 
-  const search = async () => {
+  const run = useCallback(
+    async (query: string) => {
+      if (!query || !apiKey) return
+      setBusy(true)
+      setError(null)
+      const result = await lookupPlayer(apiKey, query)
+      setBusy(false)
+      if (result.ok) {
+        setPlayer(result.data)
+        cue('confirm')
+        pushLog(`Spielerprofil geladen: ${result.data.name}`, 'ok')
+      } else {
+        setPlayer(null)
+        setError(result.message)
+        cue('deny')
+      }
+    },
+    [apiKey, cue, pushLog],
+  )
+
+  // A saved Epic name means Ali shouldn't have to type it again — the panel
+  // opens on his own profile and the search bar stays free for other players.
+  useEffect(() => {
+    if (auto.current || !apiKey || !settings.epicName) return
+    auto.current = true
+    void run(settings.epicName)
+  }, [apiKey, run, settings.epicName])
+
+  const search = () => {
     const query = name.trim()
-    if (!query || !apiKey) return
-    setBusy(true)
-    setError(null)
+    if (!query) return
     cue('process')
-    const result = await lookupPlayer(apiKey, query)
-    setBusy(false)
-    if (result.ok) {
-      setPlayer(result.data)
-      cue('confirm')
-      pushLog(`Spielerprofil geladen: ${result.data.name}`, 'ok')
-    } else {
-      setPlayer(null)
-      setError(result.message)
-      cue('deny')
-    }
+    void run(query)
+  }
+
+  const remember = () => {
+    const query = name.trim()
+    if (!query) return
+    patchSettings({ epicName: query })
+    cue('confirm')
+    pushLog(`Epic-Name gemerkt: ${query}`, 'ok')
   }
 
   return (
@@ -221,7 +248,7 @@ function PlayerTracker({ index, apiKey }: { index: number; apiKey: string | null
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void search()
+                if (e.key === 'Enter') search()
               }}
               placeholder="Epic-Name…"
               spellCheck={false}
@@ -229,10 +256,20 @@ function PlayerTracker({ index, apiKey }: { index: number; apiKey: string | null
               className="hud-input flex-1 text-left text-[0.78rem]"
               style={{ letterSpacing: 'normal' }}
             />
-            <HudButton small variant="primary" busy={busy} onClick={() => void search()}>
+            <HudButton small variant="primary" busy={busy} onClick={search}>
               Suchen
             </HudButton>
           </div>
+
+          {name.trim() && name.trim() !== settings.epicName && (
+            <button
+              type="button"
+              onClick={remember}
+              className="mt-1.5 font-mono text-[0.52rem] tracking-[0.12em] text-cyan/45 hover:text-cyan"
+            >
+              ★ „{name.trim()}" als meinen Epic-Namen merken
+            </button>
+          )}
 
           {error && (
             <p className="mt-3 border border-danger/25 bg-danger/[0.06] px-2.5 py-1.5 text-[0.68rem] leading-relaxed text-danger/85">
@@ -318,10 +355,20 @@ const FILTER_LABEL: Record<CupFilter, string> = {
   week: '7 TAGE',
 }
 
+type Section = 'cups' | 'player' | 'training'
+
+const SECTION_LABEL: Record<Section, string> = {
+  cups: 'Cups & Turniere',
+  player: 'Spieler-Tracker',
+  training: 'Aim & Sensitivität',
+}
+
+const SECTION_ORDER: Section[] = ['cups', 'player', 'training']
+
 export function FortniteView() {
   const { calm, settings } = useSystem()
+  const [section, setSection] = useState<Section>('cups')
   const ioKey = settings.fortniteApiKey
-  const [status, setStatus] = useState<'checking' | 'online' | 'offline' | 'unknown'>('checking')
   const [playlists, setPlaylists] = useState<FortnitePlaylist[] | null>(null)
   const [news, setNews] = useState<FortniteNewsItem[] | null>(null)
   const [art, setArt] = useState<FortniteArt[]>([])
@@ -329,8 +376,21 @@ export function FortniteView() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<CupFilter>('all')
   const [now, setNow] = useState(() => Date.now())
-  const [liveCups, setLiveCups] = useState<DisplayCup[] | null>(null)
+  const [regionCups, setRegionCups] = useState<DisplayCup[] | null>(null)
   const [liveError, setLiveError] = useState<string | null>(null)
+
+  // Europe — the default and the only region RonalJarvis needs elsewhere —
+  // comes from the shared hub, so the assistant and this panel never disagree
+  // and never fetch the same windows twice.
+  const fortnite = useSlice('fortnite')
+  const status: 'checking' | 'online' | 'offline' | 'unknown' =
+    fortnite.status === 'loading' || fortnite.status === 'idle'
+      ? 'checking'
+      : fortnite.data?.status
+        ? fortnite.data.status.online
+          ? 'online'
+          : 'offline'
+        : 'unknown'
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000)
@@ -338,16 +398,30 @@ export function FortniteView() {
   }, [])
 
   useEffect(() => {
-    void fetchStatus().then((r) => setStatus(r.ok ? (r.data.online ? 'online' : 'offline') : 'unknown'))
     void fetchActivePlaylists().then((r) => setPlaylists(r.ok ? r.data : []))
     void fetchBrNews().then((r) => setNews(r.ok ? r.data : []))
     void fetchCosmeticArt().then(setArt)
   }, [])
 
-  // Real tournament windows, when the operator supplied a key.
+  const toDisplay = useCallback(
+    (c: LiveCup): DisplayCup => ({
+      id: c.id,
+      name: c.shortName || c.name,
+      format: c.playlist,
+      region: c.region,
+      prize: '',
+      start: c.start,
+      end: c.end,
+      image: c.image,
+      artKey: c.name + c.region,
+    }),
+    [],
+  )
+
+  // Any region other than Europe is a one-off request outside the hub.
   useEffect(() => {
-    if (!ioKey) {
-      setLiveCups(null)
+    if (!ioKey || region === 'EU') {
+      setRegionCups(null)
       setLiveError(null)
       return
     }
@@ -356,28 +430,19 @@ export function FortniteView() {
       if (cancelled) return
       if (result.ok) {
         setLiveError(null)
-        setLiveCups(
-          result.data.map((c) => ({
-            id: c.id,
-            name: c.shortName || c.name,
-            format: c.playlist,
-            region: c.region,
-            prize: '',
-            start: c.start,
-            end: c.end,
-            image: c.image,
-            artKey: c.name + c.region,
-          })),
-        )
+        setRegionCups(result.data.map(toDisplay))
       } else {
-        setLiveCups(null)
+        setRegionCups(null)
         setLiveError(result.message)
       }
     })
     return () => {
       cancelled = true
     }
-  }, [ioKey, region])
+  }, [ioKey, region, toDisplay])
+
+  const liveCups: DisplayCup[] | null =
+    region === 'EU' ? (fortnite.data?.cups?.map(toDisplay) ?? null) : regionCups
 
   const estimate = useMemo(() => getCupSchedule(new Date(now), [region]), [now, region])
 
@@ -420,7 +485,23 @@ export function FortniteView() {
   const countdown = useCountdown(nextCup?.start ?? new Date(now))
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+    <div className="space-y-3">
+      {/* ---------------------------------------------------------- sections */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {SECTION_ORDER.map((id) => (
+          <HudButton
+            key={id}
+            small
+            variant={section === id ? 'primary' : 'ghost'}
+            onClick={() => setSection(id)}
+          >
+            {SECTION_LABEL[id]}
+          </HudButton>
+        ))}
+      </div>
+
+      {section === 'cups' && (
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-12">
       {/* ------------------------------------------------------------- cups */}
       <HoloCard
         index={0}
@@ -606,10 +687,8 @@ export function FortniteView() {
           </div>
         </HoloCard>
 
-        <PlayerTracker index={2} apiKey={ioKey} />
-
         <HoloCard
-          index={3}
+          index={2}
           tone="lime"
           title="Aktive Modi"
           status={playlists === null ? 'LADE...' : `${playlists.length}`}
@@ -642,7 +721,7 @@ export function FortniteView() {
         </HoloCard>
 
         <HoloCard
-          index={4}
+          index={3}
           tone="amber"
           title="News"
           status={news === null ? 'LADE...' : `${news.length}`}
@@ -669,6 +748,61 @@ export function FortniteView() {
           )}
         </HoloCard>
       </div>
+      </div>
+      )}
+
+      {section === 'player' && (
+        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <PlayerTracker index={0} apiKey={ioKey} />
+          </div>
+          <HoloCard
+            index={1}
+            tone="violet"
+            title="Woher die Zahlen kommen"
+            status="QUELLE"
+            className="lg:col-span-7"
+          >
+            <p className="text-[0.78rem] leading-relaxed text-ice/65">
+              Die Statistiken stammen von fortniteapi.io, das Epics öffentliche Spielerdaten über
+              eine dokumentierte Schnittstelle bereitstellt — dieselben Zahlen, die Fortnite
+              in-game unter „Karriere" zeigt. Konten, die ihre Statistiken auf privat gestellt
+              haben, geben nichts heraus; RonalJarvis sagt dann genau das, statt zu raten.
+            </p>
+            <ul className="mt-3 space-y-1.5 border-t border-violet/12 pt-3 text-[0.74rem] leading-relaxed text-ice/55">
+              <li>· Der Epic-Name lässt sich merken — dann öffnet der Tracker direkt dein Profil.</li>
+              <li>· Ranglisten-Punkte und Turnierplatzierungen liegen hinter einem Epic-Login und
+                sind hier bewusst nicht enthalten.</li>
+              <li>· Frag RonalJarvis „Wie sind meine Fortnite Stats?" — er liest dieselben Daten.</li>
+            </ul>
+          </HoloCard>
+        </div>
+      )}
+
+      {section === 'training' && (
+        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-12">
+          <HoloCard
+            index={0}
+            tone="lime"
+            title="Aim-Training"
+            status="DRILLS"
+            className="lg:col-span-7"
+            scan
+          >
+            <AimTrainer />
+          </HoloCard>
+
+          <HoloCard
+            index={1}
+            tone="violet"
+            title="Find Your Sensitivity"
+            status="SENS"
+            className="lg:col-span-5"
+          >
+            <SensFinder />
+          </HoloCard>
+        </div>
+      )}
     </div>
   )
 }

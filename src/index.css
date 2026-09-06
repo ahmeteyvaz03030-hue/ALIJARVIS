@@ -26,7 +26,27 @@
   --hud-line-soft: rgb(53 230 255 / 0.1);
   --hud-glow: rgb(53 230 255 / 0.45);
   --panel-bg: linear-gradient(160deg, rgb(10 26 38 / 0.82), rgb(4 12 18 / 0.9));
+  /* Set by the interface mode (see lib/jarvisModes.ts). Cyan is NORMAL. */
+  --jv-accent: 53, 230, 255;
   color-scheme: dark;
+}
+
+/* ==========================================================================
+   Interface modes
+   The mode tints the frame — the panel tones stay as each module defined them,
+   so a mode reads as lighting rather than a repaint.
+   ========================================================================== */
+:root[data-jarvis-mode] .vignette {
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 40%, rgb(2 5 8 / 0.55) 100%),
+    radial-gradient(ellipse at 50% 0%, rgb(var(--jv-accent) / 0.07), transparent 55%);
+}
+
+:root[data-jarvis-mode='night'] body { filter: saturate(0.82) brightness(0.9); }
+:root[data-jarvis-mode='emergency'] .vignette {
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 32%, rgb(24 2 5 / 0.6) 100%),
+    radial-gradient(ellipse at 50% 0%, rgb(255 82 92 / 0.12), transparent 60%);
 }
 
 * { box-sizing: border-box; }

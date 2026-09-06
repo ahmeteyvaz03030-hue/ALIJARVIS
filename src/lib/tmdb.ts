@@ -42,6 +42,8 @@ interface TmdbGenre {
 
 interface TmdbDetail extends TmdbListItem {
   runtime: number | null
+  /** Series carry per-episode minutes here instead of `runtime`. */
+  episode_run_time?: number[]
   tagline: string | null
   genres: TmdbGenre[]
   videos?: { results: TmdbVideo[] }
@@ -130,8 +132,8 @@ export function searchMovies(apiKey: string, query: string, page: number) {
   return request<TmdbListResponse>('/search/movie', apiKey, { query, page: String(page) })
 }
 
-export function fetchMovieDetail(apiKey: string, id: number) {
-  return request<TmdbDetail>(`/movie/${id}`, apiKey, { append_to_response: 'videos' })
+export function fetchMovieDetail(apiKey: string, id: number, mediaType: 'movie' | 'tv' = 'movie') {
+  return request<TmdbDetail>(`/${mediaType}/${id}`, apiKey, { append_to_response: 'videos' })
 }
 
 export function bestTrailerKey(videos: TmdbVideo[] | undefined): string | null {
@@ -148,12 +150,18 @@ export interface TmdbDetailView {
   trailerKey: string | null
 }
 
-export async function loadDetail(apiKey: string, tmdbId: number): Promise<TmdbDetailView | null> {
-  const result = await fetchMovieDetail(apiKey, tmdbId)
+export async function loadDetail(
+  apiKey: string,
+  tmdbId: number,
+  mediaType: 'movie' | 'tv' = 'movie',
+): Promise<TmdbDetailView | null> {
+  const result = await fetchMovieDetail(apiKey, tmdbId, mediaType)
   if (!result.ok) return null
   const { data } = result
+  // Series report per-episode minutes as a list; a movie has one `runtime`.
+  const runtime = data.runtime ?? data.episode_run_time?.[0] ?? 0
   return {
-    runtime: data.runtime ?? 0,
+    runtime,
     tagline: data.tagline ?? '',
     genre: data.genres.map((g) => g.name).join(' / '),
     trailerKey: bestTrailerKey(data.videos?.results),
