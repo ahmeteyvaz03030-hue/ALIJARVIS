@@ -1,0 +1,4 @@
+{
+  "_hinweis": "Der Direktkanal von RonalJarvis. Nachrichten hier landen nach dem Deploy auf jedem Gerät, auf dem die App offen ist (Abfrage alle 90 Sekunden). Am einfachsten: in der Owner-Konsole schreiben, 'Ganzes comms.json kopieren' drücken und den Inhalt hier ersetzen.",
+  "messages": []
+}

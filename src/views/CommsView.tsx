@@ -5,6 +5,7 @@ import { EASE } from '../lib/motion'
 import { HoloCard } from '../components/hud/HoloCard'
 import { SegmentBar, StatusPill } from '../components/hud/Readout'
 import { TonyComms } from '../components/comms/TonyComms'
+import { JarvisChannel } from '../components/comms/JarvisChannel'
 import type { useComms } from '../state/useComms'
 
 export function CommsView({ comms }: { comms: ReturnType<typeof useComms> }) {
@@ -17,7 +18,11 @@ export function CommsView({ comms }: { comms: ReturnType<typeof useComms> }) {
   }, [comms])
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+    <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-12">
+      {/* The owner's channel comes first — it carries the messages that were
+          actually written for Ali, rather than the simulated ones. */}
+      <JarvisChannel index={0} className="lg:col-span-12" />
+
       <div className="lg:col-span-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

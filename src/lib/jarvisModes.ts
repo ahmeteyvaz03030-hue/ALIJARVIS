@@ -106,12 +106,12 @@ export const MODE_SPEC: Record<JarvisMode, ModeSpec> = {
 
 /** Card ordering per mode — cards not listed keep their natural order after these. */
 export const MODE_PRIORITY: Record<JarvisMode, string[]> = {
-  normal: ['core', 'countdown', 'dialogue', 'briefing'],
+  normal: ['watchparty', 'core', 'countdown', 'dialogue', 'briefing', 'channel'],
   travel: ['countdown', 'core', 'briefing', 'weather', 'dialogue'],
   matchday: ['besiktas', 'core', 'dialogue', 'briefing'],
   gaming: ['fortnite', 'core', 'dialogue', 'briefing'],
-  cinema: ['movies', 'core', 'dialogue', 'briefing'],
-  night: ['core', 'dialogue', 'briefing'],
+  cinema: ['watchparty', 'movies', 'channel', 'core', 'dialogue', 'briefing'],
+  night: ['core', 'dialogue', 'briefing', 'channel'],
   emergency: ['emergency', 'countdown', 'core'],
 }
 

@@ -12,6 +12,8 @@ import { HoloCard } from '../components/hud/HoloCard'
 import { SegmentBar, StatusPill } from '../components/hud/Readout'
 import { JarvisChat } from '../components/jarvis/JarvisChat'
 import { BriefingCard } from '../components/jarvis/BriefingCard'
+import { WatchPartyCard } from '../components/movies/WatchPartyCard'
+import { useOwnerFeed } from '../state/useOwnerFeed'
 import { SystemLog } from '../components/sim/SystemLog'
 import { SystemMonitor } from '../components/sim/SystemMonitor'
 import { Radar } from '../components/sim/Radar'
@@ -244,6 +246,7 @@ export function HomeView({
 }) {
   const { phase, calm } = useSystem()
   const { mode } = useHub()
+  const ownerFeed = useOwnerFeed(true)
   const countdown = useCountdown(TRIP.departure)
   const flightMode = phase === 'flight_day' || phase === 'in_flight'
   const go = (view: string) => onNavigate?.(view)
@@ -360,6 +363,57 @@ export function HomeView({
     { id: 'besiktas', node: <BesiktasCard key="besiktas" index={4} onOpen={() => go('besiktas')} /> },
     { id: 'fortnite', node: <FortniteCard key="fortnite" index={5} onOpen={() => go('fortnite')} /> },
     { id: 'movies', node: <MoviesCard key="movies" index={6} onOpen={() => go('movies')} /> },
+    {
+      id: 'watchparty',
+      node: (
+        <WatchPartyCard
+          key="watchparty"
+          index={6}
+          className="lg:col-span-7"
+          onOpenChannel={() => go('comms')}
+        />
+      ),
+    },
+    {
+      id: 'channel',
+      node: (
+        <HoloCard
+          key="channel"
+          index={6}
+          tone="cyan"
+          title="Direktkanal"
+          status={ownerFeed.unread.length ? `${ownerFeed.unread.length} NEU` : 'OFFEN'}
+          className="lg:col-span-5"
+        >
+          <button type="button" onClick={() => go('comms')} className="w-full text-left">
+            {ownerFeed.messages.length === 0 ? (
+              <p className="text-[0.76rem] leading-relaxed text-ice/55">
+                Noch keine Nachricht auf dem Direktkanal.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {ownerFeed.messages.slice(0, 3).map((m) => (
+                  <div key={m.id} className="border-l-2 border-cyan/40 pl-2">
+                    <div className="truncate text-[0.78rem] text-ice/85">
+                      {m.text || (m.voice ? '🎙 Sprachnachricht' : m.film?.title) || '—'}
+                    </div>
+                    <div className="font-mono text-[0.48rem] tracking-[0.1em] text-cyan/35">
+                      {m.from === 'ali' ? 'DU' : 'RONALJARVIS'} ·{' '}
+                      {new Date(m.at).toLocaleString('de-DE', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </button>
+        </HoloCard>
+      ),
+    },
     {
       id: 'monitor',
       node: (

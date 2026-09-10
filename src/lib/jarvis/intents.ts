@@ -15,6 +15,9 @@ export type Intent =
   | 'movies_new'
   | 'movies_recommend'
   | 'watchlist'
+  | 'watchparty'
+  | 'cinema'
+  | 'channel'
   | 'series'
   | 'flight'
   | 'marmaris'
@@ -63,6 +66,21 @@ const MATCHERS: Matcher[] = [
     intent: 'besiktas',
     strong: [/be[sşs]ikta[sş]/i, /bjk/i, /süper ?lig/i, /super ?lig/i],
     words: [/spiel/i, /tabelle/i, /liga/i, /fußball/i, /fussball/i, /verein/i, /derby/i, /kartal/i],
+  },
+  {
+    intent: 'watchparty',
+    strong: [/filmabend/i, /watch ?party/i, /was schauen wir/i, /wann schauen wir/i],
+    words: [/popcorn/i, /zusammen schauen/i, /angekündigt/i],
+  },
+  {
+    intent: 'cinema',
+    strong: [/\bkino\b/i, /capitol/i, /kinoprogramm/i, /leinwand/i],
+    words: [/karten/i, /tickets/i, /vorstellung/i, /saal/i, /plauen/i, /popcorn/i],
+  },
+  {
+    intent: 'channel',
+    strong: [/direktkanal/i, /neue nachricht/i, /hat.{0,12}geschrieben/i, /nachricht von ronaljarvis/i],
+    words: [/kanal/i, /posteingang/i, /ungelesen/i],
   },
   {
     intent: 'movies_recommend',

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useSystem, type MotionPreference, type Quality } from '../state/SystemProvider'
 import { FLIGHT_PHASES, PHASE_LABEL, type FlightPhase } from '../lib/config'
 import { authProvider, type JarvisSession } from '../lib/auth'
@@ -9,6 +9,15 @@ import { validateIoKey } from '../lib/fortniteEvents'
 import { JARVIS_MODES, MODE_SPEC } from '../lib/jarvisModes'
 import { findTeam } from '../lib/football'
 import { useHub } from '../state/DataHub'
+import { lockOwner, ownerCodeSet } from '../lib/auth/ownerGate'
+import {
+  onVoices,
+  preferredVoice,
+  speak,
+  speechSupported,
+  stopSpeaking,
+  type VoiceOption,
+} from '../lib/speech'
 import { HoloCard } from '../components/hud/HoloCard'
 import { HudButton } from '../components/hud/HudButton'
 import { StatusPill } from '../components/hud/Readout'
@@ -425,9 +434,15 @@ export function SettingsView({
       {/* -------------------------------------------------------------- modes */}
       <ModeCard index={6} />
 
+      {/* -------------------------------------------------------------- voice */}
+      <VoiceCard index={7} />
+
+      {/* ------------------------------------------------------- owner access */}
+      <OwnerAccessCard index={8} />
+
       {/* ---------------------------------------------------------- simulation */}
       <HoloCard
-        index={7}
+        index={9}
         tone="amber"
         title="Mission Simulation"
         status="DEMO"
@@ -644,6 +659,189 @@ function ModeCard({ index }: { index: number }) {
         </StatusPill>
         <span className="font-mono text-[0.58rem] tracking-[0.14em] text-cyan/45">
           AKTIV: {MODE_SPEC[mode].label}
+        </span>
+      </div>
+    </HoloCard>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Voice and owner console                                                    */
+/* -------------------------------------------------------------------------- */
+
+function VoiceCard({ index }: { index: number }) {
+  const { settings, patchSettings, cue } = useSystem()
+  const [voices, setVoices] = useState<VoiceOption[]>([])
+  const supported = speechSupported()
+
+  useEffect(() => onVoices(setVoices), [])
+
+  // Pick a German voice the first time rather than leaving it to the browser's
+  // default, which is often an English one on a German system.
+  useEffect(() => {
+    if (!settings.voiceEnabled || settings.voiceURI || voices.length === 0) return
+    const pick = preferredVoice(voices)
+    if (pick) patchSettings({ voiceURI: pick.uri })
+  }, [patchSettings, settings.voiceEnabled, settings.voiceURI, voices])
+
+  const german = voices.filter((v) => v.lang.toLowerCase().startsWith('de'))
+  const rest = voices.filter((v) => !v.lang.toLowerCase().startsWith('de'))
+
+  return (
+    <HoloCard index={index} tone="cyan" title="RonalJarvis Stimme" status="TTS" className="lg:col-span-12">
+      <p className="mb-4 max-w-2xl text-[0.8rem] leading-relaxed text-ice/65">
+        RonalJarvis kann seine Antworten und eingehende Nachrichten vorlesen. Die Stimmen
+        kommen vom Betriebssystem, der Text verlässt das Gerät nicht — kein Schlüssel, kein
+        Upload. Welche Stimmen es gibt, hängt davon ab, was auf dem Gerät installiert ist.
+      </p>
+
+      {!supported ? (
+        <p className="text-[0.78rem] leading-relaxed text-amber/80">
+          Dieser Browser hat keine Sprachausgabe.
+        </p>
+      ) : (
+        <>
+          <Row label="VORLESEN" hint="Antworten und neue Nachrichten werden gesprochen.">
+            <HudButton
+              small
+              variant={settings.voiceEnabled ? 'ghost' : 'primary'}
+              onClick={() => patchSettings({ voiceEnabled: false })}
+            >
+              AUS
+            </HudButton>
+            <HudButton
+              small
+              variant={settings.voiceEnabled ? 'primary' : 'ghost'}
+              onClick={() => {
+                patchSettings({ voiceEnabled: true })
+                cue('confirm')
+              }}
+            >
+              AN
+            </HudButton>
+          </Row>
+
+          <Row label="STIMME" hint={`${voices.length} installiert · ${german.length} deutsch`}>
+            <select
+              value={settings.voiceURI ?? ''}
+              onChange={(e) => patchSettings({ voiceURI: e.target.value || null })}
+              className="hud-input max-w-[16rem] text-left text-[0.78rem]"
+              style={{ letterSpacing: 'normal' }}
+              aria-label="Stimme wählen"
+            >
+              <option value="">Automatisch (deutsch)</option>
+              {german.map((v) => (
+                <option key={v.uri} value={v.uri}>
+                  {v.name} · {v.lang}
+                </option>
+              ))}
+              {rest.length > 0 && (
+                <optgroup label="Andere Sprachen">
+                  {rest.map((v) => (
+                    <option key={v.uri} value={v.uri}>
+                      {v.name} · {v.lang}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </Row>
+
+          <Row label="TEMPO" hint={`${settings.voiceRate.toFixed(2)}×`}>
+            <input
+              type="range"
+              min={0.6}
+              max={1.6}
+              step={0.05}
+              value={settings.voiceRate}
+              onChange={(e) => patchSettings({ voiceRate: Number(e.target.value) })}
+              className="w-40 accent-[#35e6ff]"
+              aria-label="Sprechtempo"
+            />
+          </Row>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-cyan/12 pt-4">
+            <HudButton
+              small
+              variant="ghost"
+              onClick={() =>
+                speak(
+                  'Willkommen zurück, Ali. Alle Systeme laufen. Soll ich dir das Briefing vorlesen?',
+                  { voiceURI: settings.voiceURI, rate: settings.voiceRate },
+                )
+              }
+            >
+              Probe hören
+            </HudButton>
+            <HudButton small variant="ghost" onClick={stopSpeaking}>
+              Stopp
+            </HudButton>
+            <StatusPill tone={settings.voiceEnabled ? 'lime' : 'cyan'}>
+              {settings.voiceEnabled ? 'STIMME AKTIV' : 'STIMME AUS'}
+            </StatusPill>
+          </div>
+
+          <p className="mt-3 border-t border-cyan/12 pt-3 text-[0.72rem] leading-relaxed text-cyan/45">
+            Eine synthetische Stimme kann nicht *deine* Stimme werden. Dafür gibt es in der
+            Owner-Konsole die Sprachnachricht: dort nimmst du dich selbst auf, und Ali hört
+            wirklich dich statt einer Nachahmung.
+          </p>
+        </>
+      )}
+    </HoloCard>
+  )
+}
+
+function OwnerAccessCard({ index }: { index: number }) {
+  const { settings, patchSettings, cue, pushLog } = useSystem()
+
+  return (
+    <HoloCard
+      index={index}
+      tone="violet"
+      title="Owner Console"
+      status={settings.showOwnerConsole ? 'SICHTBAR' : 'VERSTECKT'}
+      className="lg:col-span-12"
+    >
+      <p className="mb-4 max-w-2xl text-[0.8rem] leading-relaxed text-ice/65">
+        Über die Owner-Konsole schreibst du als RonalJarvis an Ali, kündigst Filmabende an und
+        trägst Kinotermine ein. Auf Alis Gerät bleibt sie ausgeblendet — auf deinem schaltest du
+        sie hier ein, und dahinter liegt noch ein eigener Code.
+      </p>
+
+      <Row label="IM MENÜ ZEIGEN" hint="Nur auf dem Gerät des Besitzers einschalten.">
+        <HudButton
+          small
+          variant={settings.showOwnerConsole ? 'ghost' : 'primary'}
+          onClick={() => {
+            patchSettings({ showOwnerConsole: false })
+            lockOwner()
+            cue('nav')
+          }}
+        >
+          AUS
+        </HudButton>
+        <HudButton
+          small
+          variant={settings.showOwnerConsole ? 'primary' : 'ghost'}
+          onClick={() => {
+            patchSettings({ showOwnerConsole: true })
+            cue('confirm')
+            pushLog('Owner-Konsole eingeblendet', 'warn')
+          }}
+        >
+          AN
+        </HudButton>
+      </Row>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-violet/12 pt-4">
+        <StatusPill tone={ownerCodeSet() ? 'lime' : 'amber'}>
+          {ownerCodeSet() ? 'CODE GESETZT' : 'CODE NOCH NICHT GESETZT'}
+        </StatusPill>
+        <span className="font-mono text-[0.58rem] tracking-[0.14em] text-cyan/45">
+          {ownerCodeSet()
+            ? 'Nur mit Code erreichbar'
+            : 'Beim ersten Öffnen legst du einen fest'}
         </span>
       </div>
     </HoloCard>

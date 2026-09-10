@@ -16,6 +16,7 @@ import type { Settings } from '../../state/SystemProvider'
 import type { WatchlistEntry } from '../../state/useWatchlist'
 import type { Todo } from '../../state/useTodos'
 import type { Profile } from '../../state/useProfile'
+import type { OwnerMessage } from '../ownerFeed'
 import { DESTINATION, ORIGIN, PHASE_LABEL, TRIP, type FlightPhase } from '../config'
 import { currentWeather, forecast } from '../../data/weather'
 import { MOVIES } from '../../data/movies'
@@ -41,6 +42,10 @@ export interface BrainContext {
   /** Stored aim-training bests, keyed by drill. */
   aimBests: Partial<Record<string, { score: number; accuracy: number }>>
   sens: { dpi: number; sens: number }
+  /** Everything on the owner's direct channel — messages, film nights, cinema dates. */
+  channel: OwnerMessage[]
+  unreadChannel: number
+  cinemaName: string
 }
 
 /* -------------------------------------------------------------------------- */
@@ -484,6 +489,120 @@ async function recommend(ctx: BrainContext, question: string): Promise<JarvisAns
   )
 }
 
+function eventsOf(ctx: BrainContext, kind: 'watchparty' | 'cinema') {
+  const now = Date.now()
+  return ctx.channel
+    .filter((m) => m.kind === kind && m.event)
+    .sort((a, b) => (a.event?.startsAt ?? 0) - (b.event?.startsAt ?? 0))
+    .filter((m) => (m.event?.startsAt ?? 0) + 4 * 3_600_000 > now)
+}
+
+function watchPartyAnswer(ctx: BrainContext): JarvisAnswer {
+  const upcoming = eventsOf(ctx, 'watchparty')
+  if (!upcoming.length) {
+    return answer(
+      'Es ist gerade kein Filmabend angekündigt. Sobald einer über den Direktkanal reinkommt, steht er mit Trailer und Countdown auf der Startseite.',
+      [],
+      [{ label: 'Kanal öffnen', view: 'comms' }],
+    )
+  }
+  const next = upcoming[0]
+  const event = next.event as NonNullable<OwnerMessage['event']>
+  const when = new Date(event.startsAt)
+  return answer(
+    `Filmabend ${relativeDay(when)} um ${clock(when)} — „${next.film?.title ?? 'noch offen'}"${event.place ? ` in ${event.place}` : ''}.${event.note ? ` ${event.note}.` : ''}`,
+    [
+      {
+        kind: 'stats',
+        rows: [
+          { label: 'FILM', value: next.film?.title ?? '—', tone: 'violet' },
+          { label: 'WANN', value: `${relativeDay(when)} ${clock(when)}`, tone: 'amber' },
+          { label: 'WO', value: event.place || '—' },
+          ...(event.note ? [{ label: 'DAZU', value: event.note, tone: 'lime' as const }] : []),
+        ],
+      },
+      ...(next.film?.trailerKey
+        ? [{ kind: 'note' as const, text: 'Der Trailer liegt bereit — auf der Startseite abspielbar.', tone: 'cyan' as const }]
+        : []),
+      ...(upcoming.length > 1
+        ? [
+            {
+              kind: 'list' as const,
+              title: 'Danach',
+              items: upcoming.slice(1, 4).map<ListItem>((m) => ({
+                primary: m.film?.title ?? 'Filmabend',
+                secondary: m.event ? `${relativeDay(new Date(m.event.startsAt))} · ${clock(new Date(m.event.startsAt))}` : '',
+                tone: 'violet',
+              })),
+            },
+          ]
+        : []),
+    ],
+    [{ label: 'Kanal öffnen', view: 'comms' }],
+  )
+}
+
+function cinemaAnswer(ctx: BrainContext): JarvisAnswer {
+  const upcoming = eventsOf(ctx, 'cinema')
+  if (!upcoming.length) {
+    return answer(
+      `Für ${ctx.cinemaName} steht noch kein Termin von uns im Kalender. Im Kino-Modul liegen das Programm, die Preise und was gerade bundesweit läuft.`,
+      [],
+      [{ label: 'Kino öffnen', view: 'cinema' }],
+    )
+  }
+  const next = upcoming[0]
+  const event = next.event as NonNullable<OwnerMessage['event']>
+  const when = new Date(event.startsAt)
+  return answer(
+    `Kino ${relativeDay(when)} um ${clock(when)}: „${next.film?.title ?? 'Film folgt'}" in ${event.place || ctx.cinemaName}.${event.seat ? ` Platz ${event.seat}.` : ''}`,
+    [
+      {
+        kind: 'stats',
+        rows: [
+          { label: 'FILM', value: next.film?.title ?? '—', tone: 'amber' },
+          { label: 'WANN', value: `${relativeDay(when)} ${clock(when)}`, tone: 'amber' },
+          { label: 'WO', value: event.place || ctx.cinemaName },
+          ...(event.seat ? [{ label: 'PLATZ', value: event.seat, tone: 'lime' as const }] : []),
+          ...(event.price ? [{ label: 'PREIS', value: event.price }] : []),
+        ],
+      },
+    ],
+    [{ label: 'Kino öffnen', view: 'cinema' }],
+  )
+}
+
+function channelAnswer(ctx: BrainContext): JarvisAnswer {
+  if (!ctx.channel.length) {
+    return answer('Auf dem Direktkanal liegt noch nichts.', [], [
+      { label: 'Kanal öffnen', view: 'comms' },
+    ])
+  }
+  const incoming = ctx.channel.filter((m) => m.from !== 'ali')
+  return answer(
+    ctx.unreadChannel
+      ? `Du hast ${ctx.unreadChannel} ungelesene Nachricht${ctx.unreadChannel === 1 ? '' : 'en'} auf dem Direktkanal.`
+      : `Auf dem Direktkanal liegen ${incoming.length} Nachricht${incoming.length === 1 ? '' : 'en'}, alle gelesen.`,
+    [
+      {
+        kind: 'list',
+        items: incoming.slice(0, 5).map<ListItem>((m) => ({
+          primary: m.text || (m.voice ? 'Sprachnachricht' : (m.film?.title ?? '—')),
+          secondary: new Date(m.at).toLocaleString('de-DE', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          trailing: m.kind === 'message' ? undefined : m.kind === 'cinema' ? 'KINO' : 'FILMABEND',
+          tone: 'cyan',
+        })),
+      },
+    ],
+    [{ label: 'Kanal öffnen', view: 'comms' }],
+  )
+}
+
 function watchlistAnswer(ctx: BrainContext): JarvisAnswer {
   if (!ctx.watchlist.length) {
     return answer(
@@ -769,6 +888,8 @@ function helpAnswer(): JarvisAnswer {
           { primary: '„Welche Filme sind neu?"', secondary: 'Kinostarts und Angekündigtes' },
           { primary: '„Empfiehl mir einen Actionfilm."', secondary: 'Erst deine Merkliste' },
           { primary: '„Zeig mir meine Watchlist."', secondary: 'Alles Vorgemerkte' },
+          { primary: '„Wann ist der Filmabend?"', secondary: 'Angekündigter Film mit Trailer' },
+          { primary: '„Was läuft im Kino?"', secondary: 'Termine, Preise, Kinostarts' },
           { primary: '„Wann geht mein Flug?"', secondary: 'Countdown, Gate, Sitz' },
           { primary: '„Wie viel sind 250 Euro in Lira?"', secondary: 'Tageskurs' },
           { primary: '„Wie ist das Wetter in Marmaris?"', secondary: 'Jetzt und die nächsten Tage' },
@@ -866,15 +987,39 @@ export async function buildBriefing(ctx: BrainContext): Promise<JarvisAnswer> {
     lines: [`Marmaris ${w.tempC} °C · Wasser ${w.seaC} °C`, w.summary],
   })
 
+  /* --- Film night and cinema */
+  const party = eventsOf(ctx, 'watchparty')[0]
+  const kino = eventsOf(ctx, 'cinema')[0]
+  if (party || kino) {
+    sections.push({
+      glyph: '🍿',
+      title: 'FILMABEND',
+      tone: 'violet',
+      lines: [
+        party?.event
+          ? `„${party.film?.title ?? 'Film folgt'}" ${relativeDay(new Date(party.event.startsAt))} um ${clock(new Date(party.event.startsAt))} · ${party.event.place}`
+          : 'Kein Filmabend angekündigt.',
+        ...(kino?.event
+          ? [
+              `Kino: „${kino.film?.title ?? 'Film folgt'}" ${relativeDay(new Date(kino.event.startsAt))} · ${kino.event.place}`,
+            ]
+          : []),
+      ],
+    })
+  }
+
   /* --- Tasks & comms */
   sections.push({
     glyph: '💬',
     title: 'KANÄLE & LISTEN',
     tone: 'violet',
     lines: [
+      ctx.unreadChannel
+        ? `${ctx.unreadChannel} neue Nachricht${ctx.unreadChannel === 1 ? '' : 'en'} auf dem Direktkanal.`
+        : 'Direktkanal ist gelesen.',
       ctx.unreadFromTony
         ? `${ctx.unreadFromTony} ungelesene Nachricht${ctx.unreadFromTony === 1 ? '' : 'en'} von Tony.`
-        : 'Keine ungelesenen Nachrichten.',
+        : 'Keine ungelesenen Nachrichten von Tony.',
       ctx.openTodos.length
         ? `${ctx.openTodos.length} offene Erinnerung${ctx.openTodos.length === 1 ? '' : 'en'}.`
         : 'Erinnerungsliste abgearbeitet.',
@@ -933,6 +1078,12 @@ export async function respond(question: string, ctx: BrainContext): Promise<Jarv
       return recommend(ctx, question)
     case 'watchlist':
       return watchlistAnswer(ctx)
+    case 'watchparty':
+      return watchPartyAnswer(ctx)
+    case 'cinema':
+      return cinemaAnswer(ctx)
+    case 'channel':
+      return channelAnswer(ctx)
     case 'flight':
       return flightAnswer(ctx)
     case 'marmaris':

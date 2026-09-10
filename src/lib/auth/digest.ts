@@ -41,6 +41,18 @@ function weakDigest(input: string): string {
   return acc
 }
 
+export interface DigestPair {
+  strong: string
+  weak: string
+}
+
+/** Produce a digest pair for a value the *user* chose (see ownerGate.ts). */
+export async function computeDigest(input: string): Promise<DigestPair | null> {
+  const strong = await strongDigest(input)
+  if (strong) return { strong, weak: '' }
+  return { strong: '', weak: weakDigest(input) }
+}
+
 /** Length-independent comparison so timing does not leak the prefix. */
 export function safeEqual(a: string, b: string): boolean {
   const len = Math.max(a.length, b.length)
@@ -49,11 +61,6 @@ export function safeEqual(a: string, b: string): boolean {
     diff |= (a.charCodeAt(i) | 0) ^ (b.charCodeAt(i) | 0)
   }
   return diff === 0
-}
-
-export interface DigestPair {
-  strong: string
-  weak: string
 }
 
 /**

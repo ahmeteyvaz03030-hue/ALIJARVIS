@@ -5,6 +5,7 @@ import { useTypewriter } from '../../lib/hooks'
 import { EASE } from '../../lib/motion'
 import { MODE_SPEC } from '../../lib/jarvisModes'
 import { PROCESS_STEPS } from '../../lib/jarvis/brain'
+import { speak, stopSpeaking } from '../../lib/speech'
 import type { JarvisAnswer } from '../../lib/jarvis/types'
 import { useJarvisBrain } from './useJarvisBrain'
 import { AnswerBlocks } from './AnswerBlocks'
@@ -114,7 +115,7 @@ export function JarvisChat({
   compact?: boolean
   autoFocus?: boolean
 }) {
-  const { calm, cue, pushLog, pulseCore, setJarvisSpeaking } = useSystem()
+  const { calm, cue, pushLog, pulseCore, setJarvisSpeaking, settings } = useSystem()
   const { ask, mode } = useJarvisBrain(unread)
   const [turns, setTurns] = useState<Turn[]>(() => [
     {
@@ -131,7 +132,13 @@ export function JarvisChat({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const timers = useRef<number[]>([])
 
-  useEffect(() => () => timers.current.forEach(window.clearTimeout), [])
+  useEffect(
+    () => () => {
+      timers.current.forEach(window.clearTimeout)
+      stopSpeaking()
+    },
+    [],
+  )
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus()
@@ -174,9 +181,23 @@ export function JarvisChat({
           ...prev,
           { id: ++idRef.current, role: 'jarvis', text: result.say, answer: result, fresh: true },
         ])
+        // Only the lead line is spoken — reading a stats grid aloud is noise.
+        if (settings.voiceEnabled) {
+          speak(result.say, { voiceURI: settings.voiceURI, rate: settings.voiceRate })
+        }
       })
     },
-    [ask, calm, cue, processing, pulseCore, pushLog],
+    [
+      ask,
+      calm,
+      cue,
+      processing,
+      pulseCore,
+      pushLog,
+      settings.voiceEnabled,
+      settings.voiceRate,
+      settings.voiceURI,
+    ],
   )
 
   const showSuggestions = !compact || turns.length <= 1

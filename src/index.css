@@ -36,14 +36,26 @@
    The mode tints the frame — the panel tones stay as each module defined them,
    so a mode reads as lighting rather than a repaint.
    ========================================================================== */
-:root[data-jarvis-mode] .vignette {
+:root[data-jarvis-mode] .jv-dock {
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.jv-dock::-webkit-scrollbar { display: none; }
+
+.vignette {
   background:
     radial-gradient(ellipse at 50% 45%, transparent 40%, rgb(2 5 8 / 0.55) 100%),
     radial-gradient(ellipse at 50% 0%, rgb(var(--jv-accent) / 0.07), transparent 55%);
 }
 
 :root[data-jarvis-mode='night'] body { filter: saturate(0.82) brightness(0.9); }
-:root[data-jarvis-mode='emergency'] .vignette {
+:root[data-jarvis-mode='emergency'] .jv-dock {
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.jv-dock::-webkit-scrollbar { display: none; }
+
+.vignette {
   background:
     radial-gradient(ellipse at 50% 45%, transparent 32%, rgb(24 2 5 / 0.6) 100%),
     radial-gradient(ellipse at 50% 0%, rgb(255 82 92 / 0.12), transparent 60%);
@@ -198,6 +210,12 @@ body {
   mix-blend-mode: screen;
   opacity: 0.75;
 }
+.jv-dock {
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.jv-dock::-webkit-scrollbar { display: none; }
+
 .vignette {
   position: fixed;
   inset: 0;

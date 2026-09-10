@@ -128,3 +128,22 @@ export const IconIdCard = ({ className, size = 20 }: IconProps) => (
     <path d="M5 16.2c.6-1.5 2-2.3 3.5-2.3s2.9.8 3.5 2.3M14.5 9.5h4M14.5 12.5h4M14.5 15.5h2.5" />
   </svg>
 )
+
+/** Cinema ticket — the Kino module. */
+export const IconTicket = ({ className, size = 20 }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <rect x="2.5" y="5" width="19" height="14" rx="1.5" />
+    <path d="M6 5v14M18 5v14" />
+    <path d="M6 8.5h-3.5M6 12h-3.5M6 15.5h-3.5M18 8.5h3.5M18 12h3.5M18 15.5h3.5" />
+  </svg>
+)
+
+/** Broadcast tower — the owner's direct channel. */
+export const IconBroadcast = ({ className, size = 20 }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="11" r="2" />
+    <path d="M8.2 7.2a5.5 5.5 0 0 0 0 7.6M15.8 7.2a5.5 5.5 0 0 1 0 7.6" />
+    <path d="M5.4 4.4a9.5 9.5 0 0 0 0 13.2M18.6 4.4a9.5 9.5 0 0 1 0 13.2" />
+    <path d="M12 13v8" />
+  </svg>
+)

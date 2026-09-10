@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useSystem } from '../../state/SystemProvider'
 import {
+  IconBroadcast,
   IconChecklist,
   IconComms,
   IconCore,
@@ -10,6 +11,7 @@ import {
   IconPlane,
   IconSettings,
   IconShield,
+  IconTicket,
   IconTrophy,
 } from './Icons'
 
@@ -21,8 +23,10 @@ export type ViewId =
   | 'movies'
   | 'fortnite'
   | 'besiktas'
+  | 'cinema'
   | 'tasks'
   | 'comms'
+  | 'owner'
   | 'settings'
 
 interface NavItem {
@@ -40,8 +44,10 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'movies', label: 'MOVIES', code: 'ENT', Icon: IconFilm },
   { id: 'fortnite', label: 'FORTNITE', code: 'GAME', Icon: IconTrophy },
   { id: 'besiktas', label: 'BEŞIKTAŞ', code: 'BJK', Icon: IconShield },
+  { id: 'cinema', label: 'KINO', code: 'KINO', Icon: IconTicket },
   { id: 'tasks', label: 'TASKS', code: 'TSK', Icon: IconChecklist },
-  { id: 'comms', label: 'TONY COMMS', code: 'COM', Icon: IconComms },
+  { id: 'comms', label: 'KANÄLE', code: 'COM', Icon: IconComms },
+  { id: 'owner', label: 'OWNER', code: 'OWN', Icon: IconBroadcast },
   { id: 'settings', label: 'SETTINGS', code: 'SYS', Icon: IconSettings },
 ]
 
@@ -55,7 +61,11 @@ export function NavRail({
   /** Per-view unread/open counts — shown as a small pulsing badge on the icon. */
   badges?: Partial<Record<ViewId, number>>
 }) {
-  const { cue, fx } = useSystem()
+  const { cue, fx, settings } = useSystem()
+
+  // The owner console only exists for whoever set it up — on Ali's device the
+  // entry simply isn't there.
+  const items = NAV_ITEMS.filter((item) => item.id !== 'owner' || settings.showOwnerConsole)
 
   return (
     <>
@@ -66,7 +76,7 @@ export function NavRail({
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
         className="sticky top-[3.25rem] z-40 hidden h-[calc(100vh-3.25rem)] w-[5.4rem] shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-cyan/12 bg-void/50 py-4 backdrop-blur-sm lg:flex"
       >
-        {NAV_ITEMS.map((item, i) => (
+        {items.map((item, i) => (
           <RailButton
             key={item.id}
             item={item}
@@ -98,9 +108,11 @@ export function NavRail({
         initial={{ y: 90 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-        className="fixed inset-x-0 bottom-0 z-50 flex items-stretch justify-between gap-0.5 border-t border-cyan/20 bg-void/92 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+        // Scrollable rather than squeezed: with a dozen modules, forcing them
+        // all into a phone's width made every target too small to hit.
+        className="jv-dock fixed inset-x-0 bottom-0 z-50 flex items-stretch gap-0.5 overflow-x-auto border-t border-cyan/20 bg-void/92 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
       >
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <DockButton
             key={item.id}
             item={item}
@@ -219,7 +231,7 @@ function DockButton({
       whileTap={{ scale: 0.9 }}
       // min-w-0 lets ten items share a phone's width; without it each button
       // keeps its label's intrinsic width and the dock pushes the page sideways.
-      className="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2"
+      className="relative flex w-[3.6rem] shrink-0 snap-start flex-col items-center gap-0.5 px-0.5 py-2"
       aria-current={active ? 'page' : undefined}
       aria-label={item.label}
     >

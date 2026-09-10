@@ -4,6 +4,7 @@ import { useHub } from '../../state/DataHub'
 import { useWatchlist } from '../../state/useWatchlist'
 import { useTodos } from '../../state/useTodos'
 import { useProfile } from '../../state/useProfile'
+import { useOwnerFeed } from '../../state/useOwnerFeed'
 import { aimRecords } from '../fortnite/AimTrainer'
 import { storedSens } from '../fortnite/SensFinder'
 import { respond, type BrainContext } from '../../lib/jarvis/brain'
@@ -24,6 +25,7 @@ export function useJarvisBrainContext(unreadFromTony = 0): () => BrainContext {
   const watchlist = useWatchlist()
   const { todos, open } = useTodos()
   const { profile } = useProfile()
+  const channel = useOwnerFeed()
 
   const ctxRef = useRef<BrainContext>(null as unknown as BrainContext)
   ctxRef.current = {
@@ -39,6 +41,9 @@ export function useJarvisBrainContext(unreadFromTony = 0): () => BrainContext {
     profile,
     aimBests: aimRecords(),
     sens: storedSens(),
+    channel: channel.messages,
+    unreadChannel: channel.unread.length,
+    cinemaName: settings.cinema.name,
   }
 
   return useCallback(() => ctxRef.current, [])

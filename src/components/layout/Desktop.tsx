@@ -14,6 +14,8 @@ import { MarmarisView } from '../../views/MarmarisView'
 import { MoviesView } from '../../views/MoviesView'
 import { FortniteView } from '../../views/FortniteView'
 import { BesiktasView } from '../../views/BesiktasView'
+import { CinemaView } from '../../views/CinemaView'
+import { OwnerView } from '../../views/OwnerView'
 import { ProfileView } from '../../views/ProfileView'
 import { TasksView } from '../../views/TasksView'
 import { CommsView } from '../../views/CommsView'
@@ -23,6 +25,7 @@ import { FlightModeCinematic, FlightModeStrip } from '../travel/FlightModeBanner
 import { JarvisConsole } from '../jarvis/JarvisConsole'
 import { ModeBanner } from './ModeBanner'
 import { useHub } from '../../state/DataHub'
+import { useOwnerFeed } from '../../state/useOwnerFeed'
 import { MODE_SPEC } from '../../lib/jarvisModes'
 
 const VIEW_TITLE: Record<ViewId, string> = {
@@ -33,8 +36,10 @@ const VIEW_TITLE: Record<ViewId, string> = {
   movies: 'ENTERTAINMENT INDEX',
   fortnite: 'FORTNITE TRACKER',
   besiktas: 'BEŞIKTAŞ COMMAND',
+  cinema: 'KINO PLAUEN',
   tasks: 'REMINDER LOG',
-  comms: 'PRIVATE CHANNEL',
+  comms: 'PRIVATE CHANNELS',
+  owner: 'OWNER CONSOLE',
   settings: 'SYSTEM CONFIGURATION',
 }
 
@@ -71,6 +76,7 @@ export function Desktop({
   const { phase, calm, cue, pushLog } = useSystem()
   const { mode } = useHub()
   const comms = useComms()
+  const ownerFeed = useOwnerFeed(true)
   const { open: openTasks } = useTodos()
   const [view, setView] = useState<ViewId>('home')
   const [cinematic, setCinematic] = useState<'none' | 'flight' | 'arrival'>('none')
@@ -150,7 +156,10 @@ export function Desktop({
         <NavRail
           active={view}
           onSelect={select}
-          badges={{ comms: comms.unread, tasks: openTasks.length }}
+          badges={{
+            comms: comms.unread + ownerFeed.unread.length,
+            tasks: openTasks.length,
+          }}
         />
 
         <main className="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 lg:pb-8">
@@ -201,6 +210,8 @@ export function Desktop({
               {view === 'movies' && <MoviesView onOpenSettings={() => select('settings')} />}
               {view === 'fortnite' && <FortniteView />}
               {view === 'besiktas' && <BesiktasView />}
+              {view === 'cinema' && <CinemaView />}
+              {view === 'owner' && <OwnerView />}
               {view === 'tasks' && <TasksView />}
               {view === 'comms' && <CommsView comms={comms} />}
               {view === 'settings' && (

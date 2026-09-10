@@ -68,6 +68,27 @@ export interface Settings {
   sportsDbKey: string | null
   /** Forced interface mode; `null` lets the situation decide. See src/lib/jarvisModes.ts. */
   modeOverride: JarvisMode | null
+  /** RonalJarvis reads answers and incoming messages aloud (see src/lib/speech.ts). */
+  voiceEnabled: boolean
+  /** Which installed system voice to use; `null` picks a German one. */
+  voiceURI: string | null
+  voiceRate: number
+  /** The cinema the Kino module follows — Ali's local one. */
+  cinema: CinemaConfig
+  /** Reveals the owner console in the navigation. Off on Ali's device. */
+  showOwnerConsole: boolean
+}
+
+/** Everything the Kino module needs, all of it editable by the owner. */
+export interface CinemaConfig {
+  name: string
+  city: string
+  address: string
+  phone: string
+  /** Official programme/booking page. Empty falls back to a web search. */
+  url: string
+  /** Ticket prices as published by the cinema — never guessed by the app. */
+  prices: Array<{ label: string; value: string }>
 }
 
 export type LogLevel = 'info' | 'ok' | 'warn' | 'core'
@@ -131,6 +152,22 @@ function detectPerfTier(): PerfTier {
   return 'high'
 }
 
+/**
+ * Ali's cinema. Only what is certain is filled in — the address, phone number
+ * and price list are left blank on purpose rather than invented, because a
+ * wrong price on a screen you trust is worse than an empty field.
+ */
+function defaultCinema(): CinemaConfig {
+  return {
+    name: 'Capitol Plauen',
+    city: 'Plauen',
+    address: '',
+    phone: '',
+    url: '',
+    prices: [],
+  }
+}
+
 function defaultSettings(): Settings {
   return {
     motion: 'auto',
@@ -147,6 +184,11 @@ function defaultSettings(): Settings {
     epicName: null,
     sportsDbKey: null,
     modeOverride: null,
+    voiceEnabled: false,
+    voiceURI: null,
+    voiceRate: 1,
+    cinema: defaultCinema(),
+    showOwnerConsole: false,
   }
 }
 
